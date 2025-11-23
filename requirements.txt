@@ -1,0 +1,9 @@
+python-dotenv
+sentence-transformers
+transformers
+accelerate
+pyodbc
+numpy
+pandas
+requests
+sqlalchemy
