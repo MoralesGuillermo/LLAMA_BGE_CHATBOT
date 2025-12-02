@@ -1,19 +1,19 @@
-# Sistema RAG - BGE-M3 + SQL Server + Groq/DeepSeek
+# Sistema RAG - BGE-M3 + ChromaDB + Groq/DeepSeek
 
 Sistema completo de Recuperación Aumentada por Generación (RAG) que utiliza:
-- **BGE-M3** para generar embeddings semánticos
-- **SQL Server** para almacenar documentos y vectores
-- **Groq API** (ultra-rápido, 10x más rápido) o **DeepSeek API** como modelo de lenguaje
+- **BGE-M3** para generar embeddings semánticos (1024 dimensiones)
+- **ChromaDB** para almacenamiento vectorial con HNSW
+- **Groq API** (ultra-rápido, recomendado, Llama 3.3 70B) o **DeepSeek API** como modelo de lenguaje
 
 ## 📋 Características
 
 - ✅ Procesamiento de documentos Markdown (.md)
 - ✅ Generación de embeddings con BGE-M3
-- ✅ Almacenamiento vectorial en SQL Server
-- ✅ Búsqueda semántica con similitud coseno
-- ✅ Generación de respuestas contextuales con DeepSeek
-- ✅ **Chatbot interactivo por consola** 🆕
-- ✅ **Historial de conversación (últimos 5 mensajes)** 🆕
+- ✅ Almacenamiento vectorial en ChromaDB (sin configuración, persistencia automática)
+- ✅ Búsqueda semántica con similitud coseno y HNSW
+- ✅ **Groq API con Llama 3.3 70B** (ultra-rápido, 10-20x más rápido que alternativas)
+- ✅ Alternativa DeepSeek API
+- ✅ **Chatbot interactivo por consola** con historial de conversación
 - ✅ Modo de consultas únicas CLI
 - ✅ División opcional de documentos en chunks
 - ✅ Manejo robusto de errores
@@ -21,16 +21,17 @@ Sistema completo de Recuperación Aumentada por Generación (RAG) que utiliza:
 ## 🏗️ Estructura del Proyecto
 
 ```
-rag_system/
+LLAMA_BGE_CHATBOT/
 │
 ├── data/
-│   └── docs/              # Archivos .md para ingestion
+│   ├── docs/              # Archivos .md para ingestion
+│   └── chroma/            # Base de datos ChromaDB (auto-generado)
 │
 ├── src/
 │   ├── embeddings/
 │   │   └── embedder.py    # Generación de embeddings BGE-M3
 │   ├── database/
-│   │   ├── connection.py  # Conexión a SQL Server
+│   │   ├── chroma_vector_store.py  # ChromaDB storage
 │   │   └── repository.py  # Operaciones CRUD
 │   ├── ingestion/
 │   │   └── ingest_docs.py # Carga y preprocesamiento
@@ -38,10 +39,11 @@ rag_system/
 │   │   ├── retriever.py   # Búsqueda semántica
 │   │   └── rag_pipeline.py # Pipeline completo
 │   ├── llm/
-│   │   └── deepseek_client.py # Cliente DeepSeek API
+│   │   ├── groq_client.py      # Cliente Groq API (recomendado)
+│   │   └── deepseek_client.py  # Cliente DeepSeek API
 │   ├── chatbot/
-│   │   └── chatbot.py     # Chatbot con historial 🆕
-│   ├── chat.py            # Chatbot interactivo de consola 🆕
+│   │   └── chatbot.py     # Chatbot con historial
+│   ├── chat.py            # Chatbot interactivo de consola
 │   └── main.py            # Punto de entrada CLI
 │
 ├── .env.example           # Template de variables de entorno
@@ -55,7 +57,8 @@ rag_system/
 ### 1. Clonar o descargar el proyecto
 
 ```bash
-cd rag_system
+git clone <tu-repo>
+cd LLAMA_BGE_CHATBOT
 ```
 
 ### 2. Crear entorno virtual
@@ -76,39 +79,18 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 4. Configurar SQL Server
+### 4. Configurar variables de entorno
 
-Necesitas tener SQL Server instalado y accesible. El sistema creará automáticamente la tabla `Documents` con el siguiente esquema:
-
-```sql
-CREATE TABLE Documents (
-    id INT PRIMARY KEY IDENTITY(1,1),
-    filename NVARCHAR(255),
-    content NVARCHAR(MAX),
-    embedding VARBINARY(MAX)
-)
-```
-
-### 5. Configurar variables de entorno
-
-Copia el archivo `.env.example` a `.env` y configura tus credenciales:
+Copia el archivo `.env.example` a `.env` y configura tu API key:
 
 ```bash
 cp .env.example .env
 ```
 
-Edita `.env` con tus valores:
+Edita `.env` con tu API key (solo necesitas una):
 
 ```env
-# SQL Server
-DB_HOST=localhost
-DB_PORT=1433
-DB_NAME=RAG_Database
-DB_USER=sa
-DB_PASSWORD=TuPassword123
-
-# LLM API - Usa Groq (recomendado) o DeepSeek
-# Groq API (ultra-rápido, 14,400 requests/día gratis)
+# Groq API (ultra-rápido, 14,400 requests/día gratis) - RECOMENDADO
 GROQ_API_KEY=tu_groq_api_key_aqui
 
 # DeepSeek API (alternativa más lenta pero buena calidad)
@@ -131,16 +113,16 @@ DEEPSEEK_API_KEY=tu_deepseek_api_key_aqui
 
 **Comparación de LLMs:**
 
-| Característica | Groq ⚡ | DeepSeek |
+| Característica | Groq ⚡ (Recomendado) | DeepSeek |
 |----------------|---------|----------|
 | **Velocidad** | ~200-500ms | ~1-3 segundos |
 | **Gratis/día** | 14,400 requests | Según plan |
-| **Modelos** | Mixtral, Llama 3.3 | DeepSeek-Chat |
-| **Calidad** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| **Modelo** | Llama 3.3 70B | DeepSeek-Chat |
+| **Calidad** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 
-💡 **Recomendación**: Usa **Groq** para velocidad óptima (10x más rápido) con tier gratuito generoso.
+💡 **Recomendación**: Usa **Groq** para velocidad óptima (10-20x más rápido) con tier gratuito generoso.
 
-### 6. Preparar documentos
+### 5. Preparar documentos
 
 Coloca tus archivos `.md` en la carpeta `data/docs/`:
 
@@ -164,6 +146,9 @@ python src/main.py --ingest --chunk
 
 # Forzar re-procesamiento de documentos existentes
 python src/main.py --ingest --force
+
+# Usar DeepSeek en lugar de Groq
+python src/main.py --ingest --llm-provider deepseek
 ```
 
 ### Consultas
@@ -180,36 +165,13 @@ python src/main.py --query "¿Qué es Python?"
 python src/main.py --query "¿Cómo funciona el sistema?" --show-sources
 ```
 
-#### Modo interactivo
+#### Modo interactivo simple
 
 ```bash
 python src/main.py
 ```
 
-Esto iniciará un modo interactivo donde puedes hacer múltiples preguntas:
-
-```
-💬 Tu pregunta: ¿Qué información tienes sobre machine learning?
-🤖 Respuesta: [Respuesta basada en tus documentos]
-
-💬 Tu pregunta: salir
-¡Hasta luego!
-```
-
-### Opciones avanzadas
-
-```bash
-# Recuperar más documentos relevantes
-python src/main.py --query "tu pregunta" --top-k 5
-
-# Ajustar temperatura de DeepSeek (0.0 = más determinista, 1.0 = más creativo)
-python src/main.py --query "tu pregunta" --temperature 0.5
-
-# Combinación de opciones
-python src/main.py --query "tu pregunta" --top-k 5 --temperature 0.7 --show-sources
-```
-
-### 🤖 Chatbot Interactivo (Consola) 🆕
+### 🤖 Chatbot Interactivo (Recomendado)
 
 Inicia el chatbot interactivo por consola:
 
@@ -222,6 +184,7 @@ python src/chat.py
 - 🧠 Mantiene historial de los últimos 5 mensajes
 - 🔍 Sistema RAG con búsqueda semántica en documentos
 - 📚 Muestra fuentes consultadas con scores de similitud
+- ⚡ Respuestas ultra-rápidas con Groq (200-500ms)
 - 📊 Comandos especiales:
   - `salir` o `exit`: Terminar el chat
   - `limpiar`: Borrar historial de conversación
@@ -236,6 +199,25 @@ python src/chat.py
 📚 Fuentes consultadas:
   1. becas.md (similitud: 0.845)
   2. menciones_honorificas.md (similitud: 0.234)
+
+⚡ Tiempo: 350ms
+```
+
+### Opciones avanzadas
+
+```bash
+# Recuperar más documentos relevantes
+python src/main.py --query "tu pregunta" --top-k 5
+
+# Ajustar temperatura del LLM (0.0 = más determinista, 1.0 = más creativo)
+python src/main.py --query "tu pregunta" --temperature 0.5
+
+# Combinación de opciones
+python src/main.py --query "tu pregunta" --top-k 5 --temperature 0.7 --show-sources
+
+# Usar DeepSeek en lugar de Groq
+python src/main.py --query "tu pregunta" --llm-provider deepseek
+python src/chat.py --llm-provider deepseek
 ```
 
 ### Estadísticas
@@ -261,28 +243,34 @@ python src/main.py --reset
 1. **Carga de archivos**: Lee archivos `.md` desde `data/docs/`
 2. **Preprocesamiento**: Limpia el texto (espacios, saltos de línea)
 3. **Chunking** (opcional): Divide documentos largos en segmentos
-4. **Generación de embeddings**: BGE-M3 crea vectores de 1024 dimensiones
-5. **Conversión a bytes**: Transforma `float32` array a `VARBINARY`
-6. **Almacenamiento**: Guarda en SQL Server
+4. **Generación de embeddings**: BGE-M3 crea vectores de 1024 dimensiones (float32)
+5. **Almacenamiento**: Guarda en ChromaDB con persistencia automática
 
 ### Pipeline de Consulta
 
-1. **Embedding de consulta**: Convierte la pregunta en vector
-2. **Recuperación**: Obtiene TODOS los documentos de SQL Server
-3. **Cálculo de similitud**: Similitud coseno en Python
-4. **Ranking**: Ordena por relevancia y selecciona top-k
-5. **Generación RAG**: Envía contexto + pregunta a DeepSeek
-6. **Respuesta**: Retorna respuesta basada en contexto
+1. **Embedding de consulta**: Convierte la pregunta en vector (1024-dim)
+2. **Búsqueda HNSW**: ChromaDB busca documentos similares con cosine similarity
+3. **Ranking**: Ordena por relevancia y selecciona top-k
+4. **Generación RAG**: Envía contexto + pregunta a Groq/DeepSeek
+5. **Respuesta**: Retorna respuesta basada en contexto
 
-### Conversión de Embeddings
+### ChromaDB - Vector Database
 
-```python
-# Guardar
-embedding_bytes = embedding_array.astype('float32').tobytes()
+**Por qué ChromaDB?**
+- ✅ Zero configuración requerida - no necesita servidor
+- ✅ Diseñado específicamente para embeddings
+- ✅ Algoritmo HNSW (Hierarchical Navigable Small World) para búsqueda rápida
+- ✅ Persistencia automática a disco
+- ✅ Metadata integrada con vectores
+- ✅ Excelente para desarrollo y producción
+- ✅ Base de datos embebida - sin procesos externos
 
-# Recuperar
-embedding_array = np.frombuffer(embedding_bytes, dtype='float32')
-```
+**Detalles técnicos:**
+- **Ubicación**: `data/chroma/` (creado automáticamente)
+- **Colección**: `documents`
+- **Métrica**: Cosine similarity
+- **Índice**: HNSW
+- **Dimensiones**: 1024 (BGE-M3)
 
 ## 🧪 Testing de Módulos Individuales
 
@@ -292,49 +280,45 @@ Cada módulo puede ejecutarse de forma independiente para testing:
 # Test de embeddings
 python src/embeddings/embedder.py
 
-# Test de conexión a base de datos
-python src/database/connection.py
+# Test de ChromaDB
+python src/database/chroma_vector_store.py
 
 # Test de ingestion
 python src/ingestion/ingest_docs.py
+
+# Test de Groq client
+python src/llm/groq_client.py
 
 # Test de DeepSeek client
 python src/llm/deepseek_client.py
 
 # Test de retriever
 python src/rag/retriever.py
+
+# Test de chatbot
+python src/chatbot/chatbot.py
 ```
 
 ## ⚠️ Requisitos del Sistema
 
 - **Python**: 3.8 o superior
-- **SQL Server**: 2017 o superior
-- **ODBC Driver**: ODBC Driver 17 for SQL Server
 - **RAM**: Mínimo 4GB (recomendado 8GB para BGE-M3)
 - **Espacio en disco**: ~2GB para el modelo BGE-M3
+- **Internet**: Solo para primera descarga del modelo y llamadas API
 
-### Instalar ODBC Driver en Linux
-
-```bash
-# Ubuntu/Debian
-curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
-sudo apt-get update
-sudo ACCEPT_EULA=Y apt-get install -y msodbcsql17
-```
+**No se requiere:**
+- ❌ SQL Server
+- ❌ ODBC Drivers
+- ❌ Configuración de base de datos
+- ❌ Servidor externo
 
 ## 🐛 Troubleshooting
 
-### Error: "pyodbc.Error: SQL Server connection failed"
-
-- Verifica que SQL Server esté corriendo
-- Confirma host, puerto, usuario y password en `.env`
-- Verifica que el firewall permita conexiones al puerto 1433
-
-### Error: "DEEPSEEK_API_KEY no está configurada"
+### Error: "GROQ_API_KEY no está configurada"
 
 - Asegúrate de tener el archivo `.env` en la raíz del proyecto
 - Verifica que la API key sea válida
+- Copia `.env.example` a `.env` si no existe
 
 ### Error: "No hay documentos en la base de datos"
 
@@ -345,18 +329,24 @@ sudo ACCEPT_EULA=Y apt-get install -y msodbcsql17
 
 - El modelo pesa ~2GB, la primera vez tomará tiempo
 - Se descarga automáticamente en `~/.cache/huggingface/`
+- Solo se descarga una vez
 
 ### Errores de memoria con BGE-M3
 
 - Cierra otras aplicaciones
 - Reduce el tamaño de los documentos usando `--chunk`
 
+### ChromaDB: Error de persistencia
+
+- Elimina la carpeta `data/chroma/` y vuelve a ejecutar `--ingest`
+- Verifica permisos de escritura en `data/`
+
 ## 📝 Ejemplo de Uso Completo
 
 ```bash
 # 1. Configurar entorno
 cp .env.example .env
-# Editar .env con tus credenciales
+# Editar .env con tu GROQ_API_KEY
 
 # 2. Instalar dependencias
 pip install -r requirements.txt
@@ -368,12 +358,32 @@ echo "# SQL\nSQL es un lenguaje de consultas." > data/docs/sql.md
 # 4. Ingerir documentos
 python src/main.py --ingest
 
-# 5. Hacer consultas
-python src/main.py --query "¿Qué es Python?" --show-sources
+# 5. Iniciar chatbot interactivo
+python src/chat.py
 
-# 6. Modo interactivo
-python src/main.py
+# O hacer consultas directas
+python src/main.py --query "¿Qué es Python?" --show-sources
 ```
+
+## 🚀 Ventajas de esta Implementación
+
+**Vs SQL Server:**
+- ✅ Sin instalación ni configuración de base de datos
+- ✅ Búsqueda vectorial nativa (HNSW)
+- ✅ Más rápido para similitud de embeddings
+- ✅ Persistencia automática
+
+**Groq API:**
+- ⚡ 10-20x más rápido que alternativas
+- 💰 14,400 requests gratis por día
+- 🎯 Modelo Llama 3.3 70B de alta calidad
+- 🔄 Fácil cambio a DeepSeek si lo necesitas
+
+**BGE-M3:**
+- 🌍 Modelo multilingüe (español, inglés, etc.)
+- 📊 1024 dimensiones (buen balance)
+- 🎯 Estado del arte en embeddings
+- 🆓 Completamente gratuito
 
 ## 🤝 Contribuciones
 
@@ -386,6 +396,7 @@ MIT License - Siéntete libre de usar este código.
 ## 🔗 Enlaces Útiles
 
 - [BGE-M3 en Hugging Face](https://huggingface.co/BAAI/bge-m3)
+- [Groq Console](https://console.groq.com/)
 - [DeepSeek Platform](https://platform.deepseek.com/)
-- [Documentación SQL Server](https://docs.microsoft.com/sql/)
-- [pyodbc Documentation](https://github.com/mkleehammer/pyodbc)
+- [ChromaDB Documentation](https://docs.trychroma.com/)
+- [Documentación de Sentence Transformers](https://www.sbert.net/)
