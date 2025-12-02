@@ -1,0 +1,45 @@
+================================================================================
+TOKEN USAGE ESTIMATION REPORT - BGE-M3 EMBEDDING MODEL
+================================================================================
+
+CURRENT DOCUMENTS ANALYSIS:
+--------------------------------------------------------------------------------
+Total documents analyzed: 7
+Total tokens (current): 6,285
+Average tokens per document: 897
+Average words per document: 484
+
+Document Details:
+  - Visitas_Guiadas_al_Campus.MD: 149 tokens, 76 words
+  - Inducción_Nuevos_Estudiantes.MD: 385 tokens, 214 words
+  - Atención_Medica.MD: 1,268 tokens, 598 words
+  - Prueba_de_Orientacion.MD: 104 tokens, 61 words
+  - Gobierno_y_grupos_Estudiantiles.MD: 607 tokens, 341 words
+  - becas.md: 3,257 tokens, 1,806 words
+  - menciones_honorificas.md: 515 tokens, 293 words
+
+================================================================================
+TASK 1: DOCUMENT INGESTION (Converting documents to embeddings)
+================================================================================
+Estimated number of documents: 45
+Average tokens per document: 897
+TOTAL TOKENS FOR INGESTION: 40,365
+
+================================================================================
+TASK 2: QUERY PROCESSING (Converting questions to embeddings)
+================================================================================
+Estimated number of queries: 200
+Average tokens per query: 15
+TOTAL TOKENS FOR QUERIES: 3,000
+
+================================================================================
+SUMMARY - TOTAL TOKEN USAGE (BGE-M3)
+================================================================================
+Task 1 - Document Ingestion: 40,365 tokens
+Task 2 - Query Processing: 3,000 tokens
+--------------------------------------------------------------------------------
+GRAND TOTAL: 43,365 tokens
+
+NOTE: These are tokens processed by BGE-M3 for creating embeddings.
+      This does NOT include tokens sent to the LLM (Groq/DeepSeek).
+================================================================================
