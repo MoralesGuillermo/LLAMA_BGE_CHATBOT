@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import os
 from typing import List, Optional
 from embeddings.embedder import Embedder
-from database.connection import DatabaseConnection
+from database.chroma_vector_store import ChromaVectorStore
 from database.repository import DocumentRepository
 from ingestion.ingest_docs import DocumentIngestion
 from llm.deepseek_client import DeepSeekClient
@@ -21,7 +21,7 @@ class RAGPipeline:
 
     def __init__(self, docs_folder: str = "data/docs", llm_provider: str = "groq"):
         """
-        Inicializa el pipeline RAG
+        Inicializa el pipeline RAG con ChromaDB
 
         Args:
             docs_folder: Carpeta con los documentos markdown
@@ -31,11 +31,11 @@ class RAGPipeline:
 
         # Inicializar componentes
         self.embedder = Embedder()
-        self.db_connection = DatabaseConnection()
-        self.db_connection.connect()
-        self.db_connection.create_table_if_not_exists()
+        self.storage = ChromaVectorStore()
+        self.storage_type = "chroma"
+        print("🔷 Usando ChromaDB para almacenamiento vectorial")
 
-        self.repository = DocumentRepository(self.db_connection)
+        self.repository = DocumentRepository(self.storage)
         self.ingestion = DocumentIngestion(docs_folder)
         self.retriever = DocumentRetriever(self.repository, self.embedder)
 
@@ -213,16 +213,23 @@ class RAGPipeline:
         Returns:
             Diccionario con estadísticas
         """
-        return {
+        stats = {
             "total_documents": self.repository.count_documents(),
-            "database": self.db_connection.database,
+            "storage_type": self.storage_type,
             "embedder_model": "BAAI/bge-m3",
             "llm_model": self.llm_client.model
         }
 
+        if self.storage_type == "sql":
+            stats["database"] = self.storage.database
+        else:
+            stats["storage_path"] = str(self.storage.storage_path)
+
+        return stats
+
     def close(self):
-        """Cierra la conexión a la base de datos"""
-        self.db_connection.disconnect()
+        """Cierra recursos (ChromaDB no requiere cierre explícito)"""
+        pass
 
 
 if __name__ == "__main__":

@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-RAG (Retrieval-Augmented Generation) system that uses BGE-M3 embeddings, SQL Server for vector storage, and either Groq API or DeepSeek API as the LLM. The system processes markdown documents, generates embeddings, stores them in SQL Server, and enables semantic search to answer user queries.
+RAG (Retrieval-Augmented Generation) system that uses BGE-M3 embeddings with ChromaDB vector storage and Groq/DeepSeek as the LLM. The system processes markdown documents, generates embeddings, stores them in ChromaDB, and enables semantic search to answer user queries.
 
 **Key features:**
 - Document ingestion from markdown files
 - BGE-M3 embeddings (1024 dimensions)
-- SQL Server vector storage (VARBINARY format)
+- ChromaDB vector database for storage
 - Groq API (ultra-fast, recommended) or DeepSeek API for LLM
 - Interactive chatbot with conversation history
 - CLI for queries and document management
@@ -26,9 +26,9 @@ source venv/bin/activate  # Linux/Mac
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment variables (copy .env.example to .env)
+# Configure environment variables (only LLM API key needed)
 cp .env.example .env
-# Then edit .env with your credentials
+# Then edit .env with your Groq or DeepSeek API key
 ```
 
 ### Document Ingestion
@@ -41,6 +41,9 @@ python src/main.py --ingest --chunk
 
 # Force re-processing of existing documents
 python src/main.py --ingest --force
+
+# Use DeepSeek instead of Groq
+python src/main.py --ingest --llm-provider deepseek
 ```
 
 ### Querying
@@ -59,6 +62,10 @@ python src/chat.py
 
 # Advanced query options
 python src/main.py --query "your question" --top-k 5 --temperature 0.7
+
+# Use DeepSeek instead of Groq
+python src/main.py --query "your question" --llm-provider deepseek
+python src/chat.py --llm-provider deepseek
 ```
 
 ### System Management
@@ -71,9 +78,8 @@ python src/main.py --reset
 
 # Test individual components
 python src/embeddings/embedder.py
-python src/database/connection.py
-python src/llm/deepseek_client.py
 python src/llm/groq_client.py
+python src/llm/deepseek_client.py
 python src/rag/retriever.py
 ```
 
@@ -83,7 +89,7 @@ python src/rag/retriever.py
 
 **RAGPipeline** (`src/rag/rag_pipeline.py`)
 - Main orchestrator for the entire RAG system
-- Initializes all components (embedder, database, LLM)
+- Initializes all components (embedder, ChromaDB, LLM)
 - Handles both ingestion and query workflows
 - LLM provider can be switched between "groq" and "deepseek"
 
@@ -92,29 +98,29 @@ python src/rag/retriever.py
 - Generates 1024-dimensional float32 embeddings
 - Critical methods:
   - `generate_embedding(text)`: Creates embedding for single text
-  - `embedding_to_bytes()`: Converts numpy array to VARBINARY for SQL Server
-  - `bytes_to_embedding()`: Converts VARBINARY back to numpy array
+  - `embedding_to_bytes()`: Converts numpy array to bytes
+  - `bytes_to_embedding()`: Converts bytes back to numpy array
 
-**DatabaseConnection** (`src/database/connection.py`)
-- Manages SQL Server connection via pyodbc
-- Automatically creates Documents table if not exists
-- Table schema:
-  ```sql
-  CREATE TABLE Documents (
-      id INT PRIMARY KEY IDENTITY(1,1),
-      filename NVARCHAR(255),
-      content NVARCHAR(MAX),
-      embedding VARBINARY(MAX)
-  )
-  ```
+**ChromaVectorStore** (`src/database/chroma_vector_store.py`)
+- Vector database designed specifically for embeddings
+- Automatic persistence to disk (`data/chroma/`)
+- Uses HNSW algorithm with cosine similarity
+- Metadata stored with vectors in ChromaDB
+- Zero configuration required
+- Key methods:
+  - `add_document()`: Adds document with embedding
+  - `get_all_documents()`: Retrieves all documents
+  - `search_similar()`: Finds similar documents using HNSW
+  - `delete_all_documents()`: Clears the collection
 
 **DocumentRepository** (`src/database/repository.py`)
-- CRUD operations for documents
+- CRUD operations for documents with ChromaDB
+- Abstraction layer over ChromaVectorStore
 - Key methods: `insert_document()`, `get_all_documents()`, `document_exists()`, `count_documents()`
 
 **DocumentRetriever** (`src/rag/retriever.py`)
 - Semantic search using cosine similarity
-- Retrieves ALL documents from DB, calculates similarity in Python (not SQL)
+- Uses ChromaDB's built-in `.query()` method with HNSW for fast search
 - Returns top-k most relevant documents with similarity scores
 
 **LLM Clients**
@@ -133,28 +139,30 @@ python src/rag/retriever.py
 1. Load .md files from `data/docs/`
 2. Clean/preprocess text
 3. Generate BGE-M3 embeddings (1024-dim float32)
-4. Convert embeddings to bytes: `embedding.astype('float32').tobytes()`
-5. Store in SQL Server with filename and content
+4. Convert embedding to list for ChromaDB
+5. Add to ChromaDB collection with metadata (filename, content)
 
 **Query Pipeline:**
 1. Convert user question to embedding
-2. Fetch ALL documents from SQL Server
-3. Convert VARBINARY embeddings back to numpy arrays
-4. Calculate cosine similarity for each document in Python
-5. Sort by similarity, select top-k
-6. Build RAG prompt with context documents
-7. Send to Groq/DeepSeek API
-8. Return response with sources
+2. Use ChromaDB's `.query()` method with HNSW algorithm
+3. Retrieve top-k most similar documents with cosine similarity scores
+4. Build RAG prompt with context documents
+5. Send to Groq/DeepSeek API
+6. Return response with sources
 
 ### Critical Implementation Details
 
-**Embedding Storage/Retrieval:**
+**Embedding Storage/Retrieval (ChromaDB):**
 ```python
 # Store
-embedding_bytes = embedding.astype('float32').tobytes()
+embedding_list = embedding.astype('float32').tolist()
+collection.add(embeddings=[embedding_list], documents=[content],
+               metadatas=[{"filename": filename}], ids=[doc_id])
 
-# Retrieve
-embedding_array = np.frombuffer(embedding_bytes, dtype='float32')
+# Search
+query_list = query_embedding.astype('float32').tolist()
+results = collection.query(query_embeddings=[query_list], n_results=top_k)
+# Returns: results['distances'], results['documents'], results['metadatas']
 ```
 
 **RAG Prompt Pattern:**
@@ -165,11 +173,15 @@ user_prompt = f"Context:\n{documents}\n\nQuestion:\n{query}"
 ```
 
 **LLM Provider Selection:**
-The system defaults to Groq for speed but can use DeepSeek:
+The system defaults to Groq but can use DeepSeek:
 ```python
 # In RAGPipeline.__init__() or RAGChatbot.__init__()
-RAGPipeline(llm_provider="groq")   # Default, ultra-fast
+RAGPipeline(llm_provider="groq")    # Default: ultra-fast
 RAGPipeline(llm_provider="deepseek")  # Alternative
+
+# CLI flags
+python src/main.py --llm-provider deepseek
+python src/chat.py --llm-provider groq
 ```
 
 **Conversation History:**
@@ -183,17 +195,14 @@ conversation_history = [(user_msg1, bot_msg1), (user_msg2, bot_msg2), ...]
 
 Required in `.env`:
 ```
-# SQL Server
-DB_HOST=localhost
-DB_PORT=1433
-DB_NAME=RAG_Database
-DB_USER=sa
-DB_PASSWORD=YourPassword123
-
-# LLM (choose one or both)
-GROQ_API_KEY=your_groq_api_key_here
-DEEPSEEK_API_KEY=your_deepseek_api_key_here
+# LLM API (at least one required, both can be configured)
+GROQ_API_KEY=your_groq_api_key_here        # Recommended: ultra-fast
+DEEPSEEK_API_KEY=your_deepseek_api_key_here  # Alternative
 ```
+
+**Notes**:
+- **ChromaDB**: No database credentials needed. Data automatically stored in `data/chroma/`
+- **No SQL Server or ODBC drivers required**
 
 ## Key Files
 
@@ -202,15 +211,32 @@ DEEPSEEK_API_KEY=your_deepseek_api_key_here
 - `src/rag/rag_pipeline.py`: Main orchestrator
 - `src/chatbot/chatbot.py`: Chatbot with conversation history
 - `src/embeddings/embedder.py`: BGE-M3 embedding generation
-- `src/database/repository.py`: Database CRUD operations
-- `src/llm/groq_client.py`: Groq API client (recommended)
+- `src/database/repository.py`: CRUD operations abstraction
+- `src/database/chroma_vector_store.py`: ChromaDB backend
+- `src/llm/groq_client.py`: Groq API client (recommended, ultra-fast)
 - `src/llm/deepseek_client.py`: DeepSeek API client
 - `src/rag/retriever.py`: Semantic search with cosine similarity
 
 ## Error Handling Notes
 
 All modules handle common errors:
-- Database connection failures (check SQL Server is running, credentials correct)
-- Missing API keys (verify `.env` file exists and has correct keys)
-- Empty database (run `--ingest` first before queries)
-- Model download (BGE-M3 is ~2GB, downloads to `~/.cache/huggingface/` on first run)
+- **ChromaDB issues**: Delete `data/chroma/` and re-run ingestion if corruption occurs
+- **Missing API keys**: Verify `.env` file exists and has correct keys for chosen LLM provider
+- **Empty storage**: Run `--ingest` first before queries
+- **Model download**: BGE-M3 is ~2GB, downloads to `~/.cache/huggingface/` on first run
+
+## ChromaDB Details
+
+**Storage Location**: `data/chroma/`
+**Collection Name**: `documents`
+**Similarity Metric**: Cosine similarity
+**Index Type**: HNSW (Hierarchical Navigable Small World)
+**Persistence**: Automatic to disk
+
+**Why ChromaDB?**
+- Zero configuration required
+- Designed specifically for embeddings
+- Fast search with HNSW algorithm
+- Automatic persistence
+- Metadata integrated with vectors
+- Excellent for both development and production

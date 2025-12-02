@@ -2,6 +2,7 @@
 Chatbot RAG interactivo por consola
 """
 import sys
+import argparse
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -15,6 +16,12 @@ def print_separator():
 
 def main():
     """Función principal del chatbot"""
+    # Parse argumentos
+    parser = argparse.ArgumentParser(description="Chatbot RAG interactivo")
+    parser.add_argument('--llm-provider', type=str, default='groq', choices=['groq', 'deepseek'],
+                        help='Proveedor de LLM: groq o deepseek (default: groq)')
+    args = parser.parse_args()
+
     print_separator()
     print("🤖 CHATBOT RAG - Sistema de Consultas Inteligente")
     print_separator()
@@ -22,7 +29,7 @@ def main():
 
     try:
         # Inicializar chatbot con historial de 5 mensajes
-        chatbot = RAGChatbot(max_history=5)
+        chatbot = RAGChatbot(max_history=5, llm_provider=args.llm_provider)
 
         print("✅ Chatbot listo!")
         print_separator()
@@ -30,8 +37,9 @@ def main():
         # Mostrar estadísticas
         stats = chatbot.get_stats()
         print("📊 Estadísticas del Sistema:")
-        print(f"  • Documentos en BD: {stats['total_documents']}")
-        print(f"  • Base de datos: {stats['database']}")
+        print(f"  • Documentos: {stats['total_documents']}")
+        print(f"  • Almacenamiento: ChromaDB")
+        print(f"  • Ruta: {stats['storage_path']}")
         print(f"  • Modelo embeddings: {stats['embedder_model']}")
         print(f"  • Modelo LLM: {stats['llm_model']}")
         print(f"  • Historial: últimos {stats['max_history']} mensajes")

@@ -14,7 +14,7 @@ from rag.rag_pipeline import RAGPipeline
 def print_banner():
     """Imprime el banner del sistema"""
     print("\n" + "=" * 60)
-    print("  SISTEMA RAG - BGE-M3 + SQL Server + DeepSeek")
+    print("  SISTEMA RAG - BGE-M3 + Groq/DeepSeek")
     print("=" * 60 + "\n")
 
 
@@ -115,8 +115,9 @@ def stats_mode(pipeline: RAGPipeline):
 
     stats = pipeline.get_stats()
 
-    print(f"Documentos en base de datos: {stats['total_documents']}")
-    print(f"Base de datos: {stats['database']}")
+    print(f"Documentos totales: {stats['total_documents']}")
+    print(f"Almacenamiento: ChromaDB")
+    print(f"Ruta: {stats['storage_path']}")
     print(f"Modelo de embeddings: {stats['embedder_model']}")
     print(f"Modelo LLM: {stats['llm_model']}")
 
@@ -187,9 +188,13 @@ Ejemplos de uso:
     parser.add_argument('--top-k', type=int, default=3,
                         help='Número de documentos relevantes a recuperar (default: 3)')
     parser.add_argument('--temperature', type=float, default=0.7,
-                        help='Temperatura para DeepSeek (default: 0.7)')
+                        help='Temperatura para el LLM (default: 0.7)')
     parser.add_argument('--show-sources', action='store_true',
                         help='Muestra las fuentes consultadas')
+
+    # Opciones de sistema
+    parser.add_argument('--llm-provider', type=str, default='groq', choices=['groq', 'deepseek'],
+                        help='Proveedor de LLM: groq o deepseek (default: groq)')
 
     args = parser.parse_args()
 
@@ -198,7 +203,7 @@ Ejemplos de uso:
 
     # Inicializar pipeline
     try:
-        pipeline = RAGPipeline()
+        pipeline = RAGPipeline(llm_provider=args.llm_provider)
     except Exception as e:
         print(f"❌ Error al inicializar el pipeline: {str(e)}")
         print("\nVerifica que:")

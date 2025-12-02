@@ -14,7 +14,7 @@ class RAGChatbot:
 
     def __init__(self, docs_folder: str = "data/docs", max_history: int = 5, llm_provider: str = "groq"):
         """
-        Inicializa el chatbot
+        Inicializa el chatbot con ChromaDB
 
         Args:
             docs_folder: Carpeta con documentos
