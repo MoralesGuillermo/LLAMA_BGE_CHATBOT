@@ -5,37 +5,50 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import os
 from typing import List, Optional
 from embeddings.embedder import Embedder
-from database.connection import DatabaseConnection
+from database.chroma_vector_store import ChromaVectorStore
 from database.repository import DocumentRepository
 from ingestion.ingest_docs import DocumentIngestion
 from llm.deepseek_client import DeepSeekClient
+from llm.groq_client import GroqClient
 from rag.retriever import DocumentRetriever
 
 
 class RAGPipeline:
     """Pipeline completo para el sistema RAG"""
 
-    def __init__(self, docs_folder: str = "data/docs"):
+    def __init__(self, docs_folder: str = "data/docs", llm_provider: str = "groq"):
         """
-        Inicializa el pipeline RAG
+        Inicializa el pipeline RAG con ChromaDB
 
         Args:
             docs_folder: Carpeta con los documentos markdown
+            llm_provider: Proveedor de LLM ("groq" o "deepseek")
         """
         print("Inicializando pipeline RAG...")
 
         # Inicializar componentes
         self.embedder = Embedder()
-        self.db_connection = DatabaseConnection()
-        self.db_connection.connect()
-        self.db_connection.create_table_if_not_exists()
+        self.storage = ChromaVectorStore()
+        self.storage_type = "chroma"
+        print("🔷 Usando ChromaDB para almacenamiento vectorial")
 
-        self.repository = DocumentRepository(self.db_connection)
+        self.repository = DocumentRepository(self.storage)
         self.ingestion = DocumentIngestion(docs_folder)
         self.retriever = DocumentRetriever(self.repository, self.embedder)
-        self.llm_client = DeepSeekClient()
+
+        # Inicializar LLM según el proveedor
+        self.llm_provider = llm_provider.lower()
+        if self.llm_provider == "groq":
+            self.llm_client = GroqClient(model="llama-3.3-70b-versatile")
+            print("✨ Usando Groq API con Llama 3.3 70B (ultra-rápido)")
+        elif self.llm_provider == "deepseek":
+            self.llm_client = DeepSeekClient()
+            print("🔷 Usando DeepSeek API")
+        else:
+            raise ValueError(f"LLM provider no soportado: {llm_provider}. Usa 'groq' o 'deepseek'")
 
         print("Pipeline RAG inicializado exitosamente\n")
 
@@ -200,16 +213,23 @@ class RAGPipeline:
         Returns:
             Diccionario con estadísticas
         """
-        return {
+        stats = {
             "total_documents": self.repository.count_documents(),
-            "database": self.db_connection.database,
+            "storage_type": self.storage_type,
             "embedder_model": "BAAI/bge-m3",
             "llm_model": self.llm_client.model
         }
 
+        if self.storage_type == "sql":
+            stats["database"] = self.storage.database
+        else:
+            stats["storage_path"] = str(self.storage.storage_path)
+
+        return stats
+
     def close(self):
-        """Cierra la conexión a la base de datos"""
-        self.db_connection.disconnect()
+        """Cierra recursos (ChromaDB no requiere cierre explícito)"""
+        pass
 
 
 if __name__ == "__main__":

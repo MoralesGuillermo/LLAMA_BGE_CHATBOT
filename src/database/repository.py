@@ -1,5 +1,6 @@
 """
 Módulo para operaciones CRUD en la base de datos
+Soporta ChromaDB como almacenamiento vectorial
 """
 import sys
 from pathlib import Path
@@ -7,26 +8,29 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 from typing import List, Tuple, Optional
-from database.connection import DatabaseConnection
+from database.chroma_vector_store import ChromaVectorStore
 
 
 class DocumentRepository:
-    """Repositorio para operaciones con documentos"""
+    """Repositorio para operaciones con documentos usando ChromaDB"""
 
-    def __init__(self, db_connection: DatabaseConnection = None):
+    def __init__(self, storage: ChromaVectorStore = None):
         """
         Inicializa el repositorio
 
         Args:
-            db_connection: Conexión a la base de datos (opcional)
+            storage: ChromaVectorStore instance (opcional, se crea uno por defecto)
         """
-        self.db = db_connection if db_connection else DatabaseConnection()
-        if not self.db.connection:
-            self.db.connect()
+        if storage is None:
+            # Por defecto usar ChromaDB
+            storage = ChromaVectorStore()
+
+        self.storage = storage
+        self.storage_type = "chroma"
 
     def insert_document(self, filename: str, content: str, embedding_bytes: bytes) -> int:
         """
-        Inserta un documento con su embedding en la base de datos
+        Inserta un documento con su embedding en ChromaDB
 
         Args:
             filename: Nombre del archivo
@@ -36,52 +40,36 @@ class DocumentRepository:
         Returns:
             ID del documento insertado
         """
-        insert_query = """
-        INSERT INTO Documents (filename, content, embedding)
-        VALUES (?, ?, ?)
-        """
-
-        select_query = "SELECT SCOPE_IDENTITY() AS id"
-
         try:
-            # Insertar documento
-            cursor = self.db.execute_query(insert_query, (filename, content, embedding_bytes))
-
-            # Obtener el ID del documento insertado
-            cursor.execute(select_query)
-            row = cursor.fetchone()
-            doc_id = int(row[0]) if row else None
-
-            if doc_id:
-                print(f"Documento '{filename}' insertado con ID: {doc_id}")
-                return doc_id
-            else:
-                raise Exception("No se pudo obtener el ID del documento insertado")
-
+            # Convertir bytes a numpy array
+            embedding = np.frombuffer(embedding_bytes, dtype='float32')
+            return self.storage.add_document(filename, content, embedding)
         except Exception as e:
             raise Exception(f"Error al insertar documento: {str(e)}")
 
     def get_all_documents(self) -> List[Tuple[int, str, str, bytes]]:
         """
-        Obtiene todos los documentos de la base de datos
+        Obtiene todos los documentos desde ChromaDB
 
         Returns:
             Lista de tuplas (id, filename, content, embedding_bytes)
         """
-        query = "SELECT id, filename, content, embedding FROM Documents"
-
         try:
-            cursor = self.db.execute_query(query)
-            documents = cursor.fetchall()
-            print(f"Se recuperaron {len(documents)} documentos")
-            return documents
-
+            # Obtener documentos de ChromaDB
+            docs = self.storage.get_all_documents()
+            # Convertir numpy arrays a bytes
+            result = []
+            for doc_id, filename, content, embedding in docs:
+                embedding_bytes = embedding.astype('float32').tobytes()
+                result.append((doc_id, filename, content, embedding_bytes))
+            print(f"Se recuperaron {len(result)} documentos")
+            return result
         except Exception as e:
             raise Exception(f"Error al obtener documentos: {str(e)}")
 
     def get_document_by_id(self, doc_id: int) -> Optional[Tuple[int, str, str, bytes]]:
         """
-        Obtiene un documento por su ID
+        Obtiene un documento por su ID desde ChromaDB
 
         Args:
             doc_id: ID del documento
@@ -89,19 +77,19 @@ class DocumentRepository:
         Returns:
             Tupla (id, filename, content, embedding_bytes) o None si no existe
         """
-        query = "SELECT id, filename, content, embedding FROM Documents WHERE id = ?"
-
         try:
-            cursor = self.db.execute_query(query, (doc_id,))
-            document = cursor.fetchone()
-            return document
-
+            doc = self.storage.get_document_by_id(doc_id)
+            if doc:
+                doc_id, filename, content, embedding = doc
+                embedding_bytes = embedding.astype('float32').tobytes()
+                return (doc_id, filename, content, embedding_bytes)
+            return None
         except Exception as e:
             raise Exception(f"Error al obtener documento: {str(e)}")
 
     def delete_document(self, doc_id: int) -> bool:
         """
-        Elimina un documento por su ID
+        Elimina un documento por su ID de ChromaDB
 
         Args:
             doc_id: ID del documento a eliminar
@@ -109,59 +97,38 @@ class DocumentRepository:
         Returns:
             True si se eliminó, False si no existía
         """
-        query = "DELETE FROM Documents WHERE id = ?"
-
         try:
-            cursor = self.db.execute_query(query, (doc_id,))
-            rows_affected = cursor.rowcount
-            if rows_affected > 0:
-                print(f"Documento {doc_id} eliminado")
-                return True
-            else:
-                print(f"Documento {doc_id} no encontrado")
-                return False
-
+            return self.storage.delete_document(doc_id)
         except Exception as e:
             raise Exception(f"Error al eliminar documento: {str(e)}")
 
     def delete_all_documents(self) -> int:
         """
-        Elimina todos los documentos de la base de datos
+        Elimina todos los documentos de ChromaDB
 
         Returns:
             Número de documentos eliminados
         """
-        query = "DELETE FROM Documents"
-
         try:
-            cursor = self.db.execute_query(query)
-            rows_affected = cursor.rowcount
-            print(f"Se eliminaron {rows_affected} documentos")
-            return rows_affected
-
+            return self.storage.delete_all_documents()
         except Exception as e:
             raise Exception(f"Error al eliminar documentos: {str(e)}")
 
     def count_documents(self) -> int:
         """
-        Cuenta el número total de documentos
+        Cuenta el número total de documentos en ChromaDB
 
         Returns:
             Número de documentos
         """
-        query = "SELECT COUNT(*) FROM Documents"
-
         try:
-            cursor = self.db.execute_query(query)
-            count = cursor.fetchone()[0]
-            return count
-
+            return self.storage.count_documents()
         except Exception as e:
             raise Exception(f"Error al contar documentos: {str(e)}")
 
     def document_exists(self, filename: str) -> bool:
         """
-        Verifica si un documento ya existe en la base de datos
+        Verifica si un documento ya existe en ChromaDB
 
         Args:
             filename: Nombre del archivo a verificar
@@ -169,12 +136,7 @@ class DocumentRepository:
         Returns:
             True si existe, False si no
         """
-        query = "SELECT COUNT(*) FROM Documents WHERE filename = ?"
-
         try:
-            cursor = self.db.execute_query(query, (filename,))
-            count = cursor.fetchone()[0]
-            return count > 0
-
+            return self.storage.document_exists(filename)
         except Exception as e:
             raise Exception(f"Error al verificar documento: {str(e)}")

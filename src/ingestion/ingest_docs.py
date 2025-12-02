@@ -38,10 +38,11 @@ class DocumentIngestion:
         markdown_files = []
         docs_path = Path(self.docs_folder)
 
-        md_files = list(docs_path.glob("*.md"))
+        # Buscar archivos .md y .MD (case insensitive)
+        md_files = list(docs_path.glob("*.md")) + list(docs_path.glob("*.MD"))
 
         if not md_files:
-            print(f"Advertencia: No se encontraron archivos .md en {self.docs_folder}")
+            print(f"Advertencia: No se encontraron archivos .md o .MD en {self.docs_folder}")
             return []
 
         for file_path in md_files:
