@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-RAG (Retrieval-Augmented Generation) system that uses BGE-M3 embeddings with ChromaDB vector storage and Groq/DeepSeek as the LLM. The system processes markdown documents, generates embeddings, stores them in ChromaDB, and enables semantic search to answer user queries.
+RAG (Retrieval-Augmented Generation) system using BGE-M3 embeddings with ChromaDB vector storage and Groq/DeepSeek LLMs. The system processes markdown documents, generates embeddings, stores them in ChromaDB, and enables semantic search to answer user queries.
 
 **Key features:**
 - Document ingestion from markdown files
-- BGE-M3 embeddings (1024 dimensions)
-- ChromaDB vector database for storage
-- Groq API (ultra-fast, recommended) or DeepSeek API for LLM
-- Interactive chatbot with conversation history
+- BGE-M3 embeddings (1024 dimensions, float32)
+- ChromaDB vector database with HNSW indexing
+- Groq API (ultra-fast, recommended, uses Llama 3.3 70B) or DeepSeek API for LLM
+- Interactive chatbot with conversation history (last 5 messages)
 - CLI for queries and document management
 
 ## Common Commands
@@ -89,49 +89,73 @@ python src/rag/retriever.py
 
 **RAGPipeline** (`src/rag/rag_pipeline.py`)
 - Main orchestrator for the entire RAG system
-- Initializes all components (embedder, ChromaDB, LLM)
+- Initializes all components: embedder, ChromaDB storage, document repository, ingestion, retriever, and LLM client
 - Handles both ingestion and query workflows
-- LLM provider can be switched between "groq" and "deepseek"
+- LLM provider switchable via constructor parameter: `llm_provider="groq"` (default) or `llm_provider="deepseek"`
+- Key methods:
+  - `ingest_documents(chunk_documents, skip_existing)`: Processes and stores documents
+  - `query(question, top_k, temperature, max_tokens)`: Runs full RAG pipeline for a query
+  - `get_stats()`: Returns system statistics
+  - `reset_database()`: Clears all documents
 
 **Embedder** (`src/embeddings/embedder.py`)
 - Uses BGE-M3 model from sentence-transformers
 - Generates 1024-dimensional float32 embeddings
+- Model downloads to `~/.cache/huggingface/` (~2GB) on first run
 - Critical methods:
   - `generate_embedding(text)`: Creates embedding for single text
-  - `embedding_to_bytes()`: Converts numpy array to bytes
-  - `bytes_to_embedding()`: Converts bytes back to numpy array
+  - `embedding_to_bytes()`: Converts numpy array to bytes (for legacy compatibility)
+  - `bytes_to_embedding()`: Converts bytes back to numpy array (for legacy compatibility)
 
 **ChromaVectorStore** (`src/database/chroma_vector_store.py`)
-- Vector database designed specifically for embeddings
-- Automatic persistence to disk (`data/chroma/`)
-- Uses HNSW algorithm with cosine similarity
-- Metadata stored with vectors in ChromaDB
+- Vector database implementation using ChromaDB
+- Automatic persistence to disk at `data/chroma/`
+- Uses HNSW algorithm with cosine similarity metric
+- Stores embeddings as lists (converted from numpy float32 arrays)
+- Uses filename-based IDs (sanitized by replacing special characters)
 - Zero configuration required
 - Key methods:
-  - `add_document()`: Adds document with embedding
-  - `get_all_documents()`: Retrieves all documents
-  - `search_similar()`: Finds similar documents using HNSW
-  - `delete_all_documents()`: Clears the collection
+  - `add_document(filename, content, embedding)`: Adds document with embedding to collection
+  - `get_all_documents()`: Retrieves all documents with embeddings
+  - `search_similar(query_embedding, top_k)`: Finds similar documents using HNSW, returns (id, filename, content, similarity_score)
+  - `document_exists(filename)`: Checks if document already exists
+  - `count_documents()`: Returns total document count
+  - `delete_all_documents()`: Clears collection by deleting and recreating it
 
 **DocumentRepository** (`src/database/repository.py`)
-- CRUD operations for documents with ChromaDB
-- Abstraction layer over ChromaVectorStore
-- Key methods: `insert_document()`, `get_all_documents()`, `document_exists()`, `count_documents()`
+- CRUD operations abstraction layer over ChromaVectorStore
+- Provides cleaner interface for document operations
+- Key methods: `insert_document()`, `get_all_documents()`, `document_exists()`, `count_documents()`, `delete_all_documents()`
+
+**DocumentIngestion** (`src/ingestion/ingest_docs.py`)
+- Loads markdown files from `data/docs/` directory
+- Cleans and preprocesses text
+- Optionally chunks large documents if `chunk_documents=True`
+- Returns list of (filename, content) tuples
 
 **DocumentRetriever** (`src/rag/retriever.py`)
-- Semantic search using cosine similarity
-- Uses ChromaDB's built-in `.query()` method with HNSW for fast search
-- Returns top-k most relevant documents with similarity scores
+- Semantic search implementation
+- Generates query embedding and uses ChromaDB's `.query()` method for HNSW search
+- Returns top-k most relevant documents with cosine similarity scores
+- Method: `retrieve_relevant_documents(query, top_k)` returns list of (filename, content, similarity_score) tuples
 
 **LLM Clients**
-- `GroqClient` (`src/llm/groq_client.py`): Ultra-fast responses using Llama 3.3 70B
-- `DeepSeekClient` (`src/llm/deepseek_client.py`): Alternative with good quality
-- Both implement `generate_response()` for RAG and `simple_chat()` for basic chat
+- `GroqClient` (`src/llm/groq_client.py`): Ultra-fast responses using Llama 3.3 70B (model: "llama-3.3-70b-versatile")
+- `DeepSeekClient` (`src/llm/deepseek_client.py`): Alternative with good quality (model: "deepseek-chat")
+- Both implement:
+  - `generate_response(query, context_documents, temperature, max_tokens)`: RAG-based response generation with strict context-only instructions
+  - `simple_chat(message, temperature)`: Basic chat without RAG context
 
 **RAGChatbot** (`src/chatbot/chatbot.py`)
-- Wraps RAGPipeline with conversation history
-- Maintains last N messages (default: 5)
-- Supports both RAG-based and history-only chat modes
+- Wraps RAGPipeline with conversation history management
+- Maintains last N messages as list of (user_message, assistant_message) tuples (default: 5)
+- Automatically truncates history when exceeding max_history
+- Supports both RAG-based (`use_rag=True`) and history-only (`use_rag=False`) chat modes
+- Key methods:
+  - `chat(user_message, top_k, temperature, use_rag)`: Process message and generate response
+  - `clear_history()`: Clears conversation history
+  - `get_history()`: Returns copy of conversation history
+  - `set_max_history(max_history)`: Updates max history size
 
 ### Data Flow
 
@@ -154,15 +178,19 @@ python src/rag/retriever.py
 
 **Embedding Storage/Retrieval (ChromaDB):**
 ```python
-# Store
+# Store - converts numpy float32 array to list
 embedding_list = embedding.astype('float32').tolist()
+doc_id = filename.replace(" ", "_").replace("/", "_").replace("\\", "_")  # Sanitize ID
 collection.add(embeddings=[embedding_list], documents=[content],
                metadatas=[{"filename": filename}], ids=[doc_id])
 
-# Search
+# Search - ChromaDB uses HNSW with cosine similarity
 query_list = query_embedding.astype('float32').tolist()
-results = collection.query(query_embeddings=[query_list], n_results=top_k)
-# Returns: results['distances'], results['documents'], results['metadatas']
+results = collection.query(query_embeddings=[query_list], n_results=top_k,
+                          include=["documents", "metadatas", "distances"])
+# Returns: results['distances'][0][i] is cosine distance (convert to similarity: 1 - distance)
+#          results['documents'][0][i] is document content
+#          results['metadatas'][0][i] is metadata dict with 'filename' key
 ```
 
 **RAG Prompt Pattern:**
@@ -176,7 +204,7 @@ user_prompt = f"Context:\n{documents}\n\nQuestion:\n{query}"
 The system defaults to Groq but can use DeepSeek:
 ```python
 # In RAGPipeline.__init__() or RAGChatbot.__init__()
-RAGPipeline(llm_provider="groq")    # Default: ultra-fast
+RAGPipeline(llm_provider="groq")    # Default: ultra-fast, Llama 3.3 70B
 RAGPipeline(llm_provider="deepseek")  # Alternative
 
 # CLI flags
@@ -189,20 +217,33 @@ RAGChatbot maintains history as list of tuples:
 ```python
 conversation_history = [(user_msg1, bot_msg1), (user_msg2, bot_msg2), ...]
 # Automatically limited to max_history entries
+# When limit exceeded: conversation_history = conversation_history[-max_history:]
+```
+
+**Document ID Generation:**
+ChromaDB requires string IDs, generated by sanitizing filenames:
+```python
+doc_id = filename.replace(" ", "_").replace("/", "_").replace("\\", "_")
+# Used for both storage and retrieval operations
 ```
 
 ## Environment Variables
 
-Required in `.env`:
+Required in `.env` (create from `.env.example`):
 ```
 # LLM API (at least one required, both can be configured)
-GROQ_API_KEY=your_groq_api_key_here        # Recommended: ultra-fast
+GROQ_API_KEY=your_groq_api_key_here        # Recommended: ultra-fast, 14,400 requests/day free
 DEEPSEEK_API_KEY=your_deepseek_api_key_here  # Alternative
+
+# Legacy SQL Server vars (not used - system uses ChromaDB)
+# DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD are ignored
 ```
 
 **Notes**:
 - **ChromaDB**: No database credentials needed. Data automatically stored in `data/chroma/`
-- **No SQL Server or ODBC drivers required**
+- **No SQL Server, ODBC drivers, or database setup required** - system uses ChromaDB
+- `.env.example` contains SQL Server config but these are legacy remnants - they are not used
+- Only API key for chosen LLM provider is required
 
 ## Key Files
 
@@ -227,16 +268,25 @@ All modules handle common errors:
 
 ## ChromaDB Details
 
-**Storage Location**: `data/chroma/`
+**Storage Location**: `data/chroma/` (created automatically)
 **Collection Name**: `documents`
-**Similarity Metric**: Cosine similarity
+**Similarity Metric**: Cosine similarity (configured via `metadata={"hnsw:space": "cosine"}`)
 **Index Type**: HNSW (Hierarchical Navigable Small World)
-**Persistence**: Automatic to disk
+**Persistence**: Automatic to disk via `PersistentClient`
+**Distance to Similarity Conversion**: `similarity = 1.0 - distance`
 
 **Why ChromaDB?**
-- Zero configuration required
+- Zero configuration required - no database setup
 - Designed specifically for embeddings
-- Fast search with HNSW algorithm
-- Automatic persistence
-- Metadata integrated with vectors
+- Fast approximate nearest neighbor search with HNSW algorithm
+- Automatic persistence to disk
+- Metadata integrated with vectors (stored together)
 - Excellent for both development and production
+- No server process needed - embedded database
+
+**Important ChromaDB Behaviors:**
+- `.query()` returns results in format: `{'ids': [[...]], 'distances': [[...]], 'documents': [[...]], 'metadatas': [[...]]}`
+- Results are double-nested lists (first index is query number, second is result number)
+- Distance values are cosine distances (0 = identical, 2 = opposite)
+- Collection persistence is automatic - no explicit save/commit needed
+- Deleting collection and recreating is the fastest way to clear all documents
