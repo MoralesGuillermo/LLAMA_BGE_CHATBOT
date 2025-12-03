@@ -5,7 +5,7 @@ Sistema completo de Recuperación Aumentada por Generación (RAG) que utiliza:
 - **ChromaDB** para almacenamiento vectorial con HNSW
 - **Groq API** (ultra-rápido, recomendado, Llama 3.3 70B) o **DeepSeek API** como modelo de lenguaje
 
-## 📋 Características
+## Características
 
 - ✅ Procesamiento de documentos Markdown (.md)
 - ✅ Generación de embeddings con BGE-M3
@@ -18,7 +18,7 @@ Sistema completo de Recuperación Aumentada por Generación (RAG) que utiliza:
 - ✅ División opcional de documentos en chunks
 - ✅ Manejo robusto de errores
 
-## 🏗️ Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 LLAMA_BGE_CHATBOT/
@@ -52,7 +52,7 @@ LLAMA_BGE_CHATBOT/
 └── CLAUDE.md              # Guía para Claude Code
 ```
 
-## 🚀 Instalación
+## Instalación
 
 ### 1. Clonar o descargar el proyecto
 
@@ -97,7 +97,7 @@ GROQ_API_KEY=tu_groq_api_key_aqui
 DEEPSEEK_API_KEY=tu_deepseek_api_key_aqui
 ```
 
-**Obtener API Key de Groq** (Recomendado - Ultra Rápido ⚡):
+**Obtener API Key de Groq** (Recomendado - Ultra Rápido):
 1. Visita [https://console.groq.com/](https://console.groq.com/)
 2. Crea una cuenta gratuita
 3. Ve a API Keys
@@ -113,14 +113,13 @@ DEEPSEEK_API_KEY=tu_deepseek_api_key_aqui
 
 **Comparación de LLMs:**
 
-| Característica | Groq ⚡ (Recomendado) | DeepSeek |
+| Característica | Groq  (Recomendado) | DeepSeek |
 |----------------|---------|----------|
 | **Velocidad** | ~200-500ms | ~1-3 segundos |
 | **Gratis/día** | 14,400 requests | Según plan |
 | **Modelo** | Llama 3.3 70B | DeepSeek-Chat |
 | **Calidad** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 
-💡 **Recomendación**: Usa **Groq** para velocidad óptima (10-20x más rápido) con tier gratuito generoso.
 
 ### 5. Preparar documentos
 
@@ -131,7 +130,7 @@ mkdir -p data/docs
 # Copia tus archivos .md a data/docs/
 ```
 
-## 📖 Uso
+## Uso
 
 ### Ingestion de Documentos
 
@@ -171,7 +170,7 @@ python src/main.py --query "¿Cómo funciona el sistema?" --show-sources
 python src/main.py
 ```
 
-### 🤖 Chatbot Interactivo (Recomendado)
+### Chatbot Interactivo (Recomendado)
 
 Inicia el chatbot interactivo por consola:
 
@@ -179,28 +178,28 @@ Inicia el chatbot interactivo por consola:
 python src/chat.py
 ```
 
-**✨ Características del Chatbot:**
-- 💬 Interfaz de chat por consola limpia e intuitiva
-- 🧠 Mantiene historial de los últimos 5 mensajes
-- 🔍 Sistema RAG con búsqueda semántica en documentos
-- 📚 Muestra fuentes consultadas con scores de similitud
-- ⚡ Respuestas ultra-rápidas con Groq (200-500ms)
-- 📊 Comandos especiales:
+**Características del Chatbot:**
+- Interfaz de chat por consola limpia e intuitiva
+- Mantiene historial de los últimos 5 mensajes
+- Sistema RAG con búsqueda semántica en documentos
+- Muestra fuentes consultadas con scores de similitud
+- Respuestas ultra-rápidas con Groq (200-500ms)
+- Comandos especiales:
   - `salir` o `exit`: Terminar el chat
   - `limpiar`: Borrar historial de conversación
   - `stats`: Ver estadísticas del sistema
 
 **Ejemplo de uso:**
 ```
-🧑 Tú: ¿Qué información tienes sobre becas?
+Tú: ¿Qué información tienes sobre becas?
 
-🤖 Chatbot: [Respuesta basada en documentos...]
+Chatbot: [Respuesta basada en documentos...]
 
-📚 Fuentes consultadas:
+Fuentes consultadas:
   1. becas.md (similitud: 0.845)
   2. menciones_honorificas.md (similitud: 0.234)
 
-⚡ Tiempo: 350ms
+Tiempo: 350ms
 ```
 
 ### Opciones avanzadas
@@ -236,7 +235,7 @@ Eliminar todos los documentos:
 python src/main.py --reset
 ```
 
-## 🔧 Arquitectura Técnica
+## Arquitectura Técnica
 
 ### Pipeline de Ingestion
 
@@ -272,7 +271,7 @@ python src/main.py --reset
 - **Índice**: HNSW
 - **Dimensiones**: 1024 (BGE-M3)
 
-## 🧪 Testing de Módulos Individuales
+## Testing de Módulos Individuales
 
 Cada módulo puede ejecutarse de forma independiente para testing:
 
@@ -299,20 +298,14 @@ python src/rag/retriever.py
 python src/chatbot/chatbot.py
 ```
 
-## ⚠️ Requisitos del Sistema
+## Requisitos del Sistema
 
 - **Python**: 3.8 o superior
 - **RAM**: Mínimo 4GB (recomendado 8GB para BGE-M3)
 - **Espacio en disco**: ~2GB para el modelo BGE-M3
 - **Internet**: Solo para primera descarga del modelo y llamadas API
 
-**No se requiere:**
-- ❌ SQL Server
-- ❌ ODBC Drivers
-- ❌ Configuración de base de datos
-- ❌ Servidor externo
-
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Error: "GROQ_API_KEY no está configurada"
 
@@ -341,7 +334,7 @@ python src/chatbot/chatbot.py
 - Elimina la carpeta `data/chroma/` y vuelve a ejecutar `--ingest`
 - Verifica permisos de escritura en `data/`
 
-## 📝 Ejemplo de Uso Completo
+## Ejemplo de Uso Completo
 
 ```bash
 # 1. Configurar entorno
@@ -365,35 +358,25 @@ python src/chat.py
 python src/main.py --query "¿Qué es Python?" --show-sources
 ```
 
-## 🚀 Ventajas de esta Implementación
-
-**Vs SQL Server:**
-- ✅ Sin instalación ni configuración de base de datos
-- ✅ Búsqueda vectorial nativa (HNSW)
-- ✅ Más rápido para similitud de embeddings
-- ✅ Persistencia automática
+## Ventajas de esta Implementación
 
 **Groq API:**
-- ⚡ 10-20x más rápido que alternativas
-- 💰 14,400 requests gratis por día
-- 🎯 Modelo Llama 3.3 70B de alta calidad
-- 🔄 Fácil cambio a DeepSeek si lo necesitas
+- 10-20x más rápido que alternativas
+- Modelo Llama 3.3 70B de alta calidad
+- Fácil cambio a DeepSeek si lo necesitas
 
 **BGE-M3:**
-- 🌍 Modelo multilingüe (español, inglés, etc.)
-- 📊 1024 dimensiones (buen balance)
-- 🎯 Estado del arte en embeddings
-- 🆓 Completamente gratuito
+- Modelo multilingüe (español, inglés, etc.)
+- 1024 dimensiones (buen balance)
+- Estado del arte en embeddings
+- Completamente gratuito
 
-## 🤝 Contribuciones
 
-Este es un proyecto de referencia. Siéntete libre de modificarlo según tus necesidades.
-
-## 📄 Licencia
+## Licencia
 
 MIT License - Siéntete libre de usar este código.
 
-## 🔗 Enlaces Útiles
+## Enlaces Útiles
 
 - [BGE-M3 en Hugging Face](https://huggingface.co/BAAI/bge-m3)
 - [Groq Console](https://console.groq.com/)
