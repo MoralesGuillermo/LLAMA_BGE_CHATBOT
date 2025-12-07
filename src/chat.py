@@ -23,7 +23,7 @@ def main():
     args = parser.parse_args()
 
     print_separator()
-    print("🤖 CHATBOT RAG - Sistema de Consultas Inteligente")
+    print("🎓 CHATBOT VOAE - Vicerrectoría de Orientación y Asuntos Estudiantiles")
     print_separator()
     print("Inicializando chatbot...")
 
@@ -89,7 +89,7 @@ def main():
                 )
 
                 # Mostrar respuesta
-                print(f"\n🤖 Chatbot: {result['answer']}\n")
+                print(f"\n🎓 VOAE: {result['answer']}\n")
 
                 # Mostrar información de match (si disponible)
                 if result.get("match_type"):
