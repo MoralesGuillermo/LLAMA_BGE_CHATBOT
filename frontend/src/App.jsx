@@ -131,7 +131,11 @@ function App() {
         <div className="chat-header">
           <div className="header-content">
             <div className="header-title">
-              <BookOpen size={28} />
+              <img
+                src="/voae-logo.png"
+                alt="VOAE Logo"
+                style={{ height: '50px', marginRight: '5px' }}
+              />
               <div>
                 <h1>Chatbot VOAE</h1>
                 <p>Vicerrectoría de Orientación y Asuntos Estudiantiles</p>
