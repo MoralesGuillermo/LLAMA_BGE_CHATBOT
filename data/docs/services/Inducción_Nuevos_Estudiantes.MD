@@ -15,3 +15,6 @@ Durante estas fechas, los participantes podrán acceder a charlas informativas, 
 - Correo: orientacion.voae@unah.edu.hn
 - Número telefónico y extensión al que atiendan Tel. 22166100 ext. 100640
 - Horarios de atención: 8:00am – 12:00m y de 1:00pm - 7:00pm
+
+
+# Nota: Actualizar las fechas a las del siguente año

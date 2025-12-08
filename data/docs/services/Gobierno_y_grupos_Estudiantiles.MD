@@ -3,9 +3,11 @@ Su finalidad es la de fomentar la participación estudiantil e incentivar a los 
 
 ## Los objetivos que tiene:
 
-Brindar el acompañamiento y apoyo necesario para la creación, consolidación y desarrollo de organizaciones estudiantiles.
-Promover la democracia estudiantil mediante el fomento de la elección democrática de los representantes estudiantiles en los diferentes órganos de gobierno universitario y garantizar su participación efectiva en la toma de decisiones de conformidad a la normativa institucional.
-Desarrollar e implementar programas de formación, dirigidos a los líderes estudiantiles, enfocados en el desarrollo de habilidades de liderazgo, gestión de proyectos, comunicación efectiva entre otros.
+1. Brindar el acompañamiento y apoyo necesario para la creación, consolidación y desarrollo de organizaciones estudiantiles.
+
+2. Promover la democracia estudiantil mediante el fomento de la elección democrática de los representantes estudiantiles en los diferentes órganos de gobierno universitario y garantizar su participación efectiva en la toma de decisiones de conformidad a la normativa institucional.
+
+3. Desarrollar e implementar programas de formación, dirigidos a los líderes estudiantiles, enfocados en el desarrollo de habilidades de liderazgo, gestión de proyectos, comunicación efectiva entre otros.
  
 
 ## ANTECEDENTES
