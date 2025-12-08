@@ -20,7 +20,7 @@
 
 /* Header */
 .chat-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #003F7F 0%, #002855 100%);
   color: white;
   padding: 20px 30px;
 }
@@ -132,14 +132,15 @@
 }
 
 .welcome-icon {
-  color: #667eea;
+  color: #FDB813;
   margin-bottom: 20px;
 }
 
 .welcome-message h2 {
   font-size: 28px;
-  color: #333;
+  color: #003F7F;
   margin-bottom: 10px;
+  font-weight: 700;
 }
 
 .welcome-message p {
@@ -174,13 +175,13 @@
   transition: all 0.3s;
   border: 2px solid #e0e0e0;
   font-size: 14px;
-  color: #667eea;
+  color: #003F7F;
 }
 
 .examples span:hover {
-  border-color: #667eea;
+  border-color: #FDB813;
   transform: translateX(5px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 4px 12px rgba(253, 184, 19, 0.3);
 }
 
 /* Message */
@@ -224,13 +225,15 @@
 }
 
 .assistant-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, #FDB813 0%, #F5A300 100%);
+  color: #003F7F;
+  font-weight: 700;
 }
 
 .user-avatar {
-  background: #e3f2fd;
-  color: #1976d2;
+  background: #E8F4F8;
+  color: #003F7F;
+  font-weight: 600;
 }
 
 .message-bubble {
@@ -247,7 +250,7 @@
 }
 
 .message.user .message-bubble {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #003F7F 0%, #002855 100%);
   color: white;
   border-bottom-right-radius: 4px;
 }
@@ -341,7 +344,7 @@
 
 .source-sim {
   font-weight: 600;
-  color: #667eea;
+  color: #FDB813;
 }
 
 /* Typing Indicator */
@@ -359,7 +362,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #667eea;
+  background: #FDB813;
   animation: typing 1.4s infinite;
 }
 
@@ -409,7 +412,7 @@
 
 .input-wrapper textarea:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #FDB813;
 }
 
 .input-wrapper textarea:disabled {
@@ -418,11 +421,12 @@
 }
 
 .send-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FDB813 0%, #F5A300 100%);
   border: none;
   border-radius: 12px;
   padding: 12px 20px;
-  color: white;
+  color: #003F7F;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
   display: flex;
@@ -432,7 +436,7 @@
 
 .send-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 8px 20px rgba(253, 184, 19, 0.4);
 }
 
 .send-button:disabled {
