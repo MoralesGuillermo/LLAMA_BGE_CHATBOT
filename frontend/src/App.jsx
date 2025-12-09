@@ -19,6 +19,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [stats, setStats] = useState(null);
   const [showStats, setShowStats] = useState(false);
+  const [llmProvider, setLlmProvider] = useState('deepseek'); // 'deepseek' o 'groq'
+  const [isChangingModel, setIsChangingModel] = useState(false);
   const messagesEndRef = useRef(null);
   const sessionId = useRef(`session-${Date.now()}`);
 
@@ -40,6 +42,10 @@ function App() {
     try {
       const response = await axios.get(`${API_BASE_URL}/stats?session_id=${sessionId.current}`);
       setStats(response.data);
+      // Actualizar el proveedor actual desde las estadísticas
+      if (response.data.llm_provider) {
+        setLlmProvider(response.data.llm_provider);
+      }
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -63,7 +69,8 @@ function App() {
         message: inputMessage,
         session_id: sessionId.current,
         top_k: 4,
-        temperature: 0.7
+        temperature: 0.7,
+        llm_provider: llmProvider  // Enviar proveedor actual
       });
 
       const assistantMessage = {
@@ -96,6 +103,41 @@ function App() {
       setMessages([]);
     } catch (error) {
       console.error('Error clearing history:', error);
+    }
+  };
+
+  const changeModel = async (newProvider) => {
+    if (isChangingModel || isLoading) return;
+
+    setIsChangingModel(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/change-model`, {
+        session_id: sessionId.current,
+        llm_provider: newProvider
+      });
+
+      setLlmProvider(newProvider);
+
+      // Mensaje de confirmación en el chat
+      const confirmationMessage = {
+        role: 'system',
+        content: `Modelo cambiado a ${newProvider === 'groq' ? 'Groq (Llama 3.3 70B)' : 'DeepSeek'}. El historial se mantiene.`,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setMessages(prev => [...prev, confirmationMessage]);
+
+      // Actualizar estadísticas
+      await fetchStats();
+    } catch (error) {
+      console.error('Error changing model:', error);
+      const errorMessage = {
+        role: 'error',
+        content: 'Error al cambiar el modelo. Por favor intenta de nuevo.',
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsChangingModel(false);
     }
   };
 
@@ -142,6 +184,20 @@ function App() {
               </div>
             </div>
             <div className="header-actions">
+              {/* Selector de Modelo */}
+              <div className="model-selector">
+                <select
+                  value={llmProvider}
+                  onChange={(e) => changeModel(e.target.value)}
+                  disabled={isChangingModel || isLoading}
+                  className="model-select"
+                  title="Cambiar modelo LLM"
+                >
+                  <option value="deepseek">DeepSeek</option>
+                  <option value="groq">Groq (Llama 3.3 70B)</option>
+                </select>
+              </div>
+
               <button
                 className="icon-button"
                 onClick={() => setShowStats(!showStats)}
@@ -167,7 +223,11 @@ function App() {
                 <span className="stat-value">{stats.total_documents}</span>
               </div>
               <div className="stat-item">
-                <span className="stat-label">Modelo LLM:</span>
+                <span className="stat-label">Proveedor:</span>
+                <span className="stat-value">{stats.llm_provider === 'groq' ? 'Groq' : 'DeepSeek'}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Modelo:</span>
                 <span className="stat-value">{stats.llm_model}</span>
               </div>
               <div className="stat-item">

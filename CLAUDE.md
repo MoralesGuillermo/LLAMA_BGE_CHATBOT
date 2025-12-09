@@ -10,8 +10,9 @@ RAG (Retrieval-Augmented Generation) system using BGE-M3 embeddings with ChromaD
 - Document ingestion from markdown files
 - BGE-M3 embeddings (1024 dimensions, float32)
 - ChromaDB vector database with HNSW indexing
-- Groq API (ultra-fast, recommended, uses Llama 3.3 70B) or DeepSeek API for LLM
-- **Hybrid FAQ system with double thresholds (85%/75%)** for precise question answering
+- DeepSeek API (default) or Groq API (ultra-fast alternative, uses Llama 3.3 70B) for LLM
+- **Hybrid FAQ system with double thresholds (75%/65%)** for precise question answering
+- Modern web interface with FastAPI backend and React frontend
 - Interactive chatbot with conversation history (last 5 messages)
 - CLI for queries and document management
 
@@ -43,8 +44,28 @@ python src/main.py --ingest --chunk
 # Force re-processing of existing documents
 python src/main.py --ingest --force
 
-# Use DeepSeek instead of Groq
-python src/main.py --ingest --llm-provider deepseek
+# Use Groq instead of DeepSeek (default)
+python src/main.py --ingest --llm-provider groq
+```
+
+### Web Interface (Recommended)
+```bash
+# Start backend (FastAPI) - Terminal 1
+cd api
+python main.py
+# API available at http://localhost:8000
+# Docs at http://localhost:8000/docs
+
+# Start frontend (React) - Terminal 2
+cd frontend
+npm install  # First time only
+npm run dev
+# Frontend available at http://localhost:5173 or http://localhost:3000
+
+# Production build
+cd frontend
+npm run build  # Creates dist/ directory
+npm run preview  # Preview production build
 ```
 
 ### Querying
@@ -64,9 +85,9 @@ python src/chat.py
 # Advanced query options
 python src/main.py --query "your question" --top-k 5 --temperature 0.7
 
-# Use DeepSeek instead of Groq
-python src/main.py --query "your question" --llm-provider deepseek
-python src/chat.py --llm-provider deepseek
+# Use Groq instead of DeepSeek (default)
+python src/main.py --query "your question" --llm-provider groq
+python src/chat.py --llm-provider groq
 ```
 
 ### System Management
@@ -92,7 +113,7 @@ python src/rag/retriever.py
 - Main orchestrator for the entire RAG system
 - Initializes all components: embedder, ChromaDB storage, document repository, ingestion, retriever, and LLM client
 - Handles both ingestion and query workflows
-- LLM provider switchable via constructor parameter: `llm_provider="groq"` (default) or `llm_provider="deepseek"`
+- LLM provider switchable via constructor parameter: `llm_provider="deepseek"` (default) or `llm_provider="groq"`
 - Key methods:
   - `ingest_documents(chunk_documents, skip_existing)`: Processes and stores documents
   - `query(question, top_k, temperature, max_tokens)`: Runs full RAG pipeline for a query
@@ -163,9 +184,9 @@ python src/rag/retriever.py
 **FAQHandler** (`src/rag/faq_handler.py`)
 - Implements hybrid FAQ system with double thresholds
 - Classifies queries into three match types based on FAQ similarity:
-  - `high` (≥85%): Returns only top-3 FAQs with temperature 0.1
-  - `medium` (75-84%): Returns top-2 FAQs + top-2 docs with temperature 0.2
-  - `low` (<75%): Returns only general documents with temperature 0.3
+  - `high` (≥75%): Returns only top-3 FAQs with temperature 0.1
+  - `medium` (65-74%): Returns top-2 FAQs + top-2 docs with temperature 0.2
+  - `low` (<65%): Returns only general documents with temperature 0.3
 - Filters documents from `data/docs/faq/` directory as FAQ sources
 - Key methods:
   - `classify_query(query, top_k)`: Returns match_type, faq_results, best_similarity
@@ -184,11 +205,11 @@ python src/rag/retriever.py
 
 **Query Pipeline (with FAQ system):**
 1. Convert user question to embedding
-2. Classify query against FAQs using similarity thresholds (85%/75%)
+2. Classify query against FAQs using similarity thresholds (75%/65%)
 3. Based on match_type, prepare context:
-   - `high`: Only top-3 FAQs from `data/docs/faq/`
-   - `medium`: Top-2 FAQs + top-2 general documents (non-FAQ)
-   - `low`: Only general documents (excludes FAQs)
+   - `high` (≥75%): Only top-3 FAQs from `data/docs/faq/`
+   - `medium` (65-74%): Top-2 FAQs + top-2 general documents (non-FAQ)
+   - `low` (<65%): Only general documents (excludes FAQs)
 4. Adjust temperature based on context_type (0.1 for FAQ-only, 0.2 for hybrid, 0.3 for docs-only)
 5. Build specialized RAG prompt with context-appropriate instructions
 6. Send to Groq/DeepSeek API
@@ -233,14 +254,14 @@ user_prompt = f"Context:\n{documents}\n\nQuestion:\n{query}"
 ```
 
 **LLM Provider Selection:**
-The system defaults to Groq but can use DeepSeek:
+The system defaults to DeepSeek but can use Groq:
 ```python
 # In RAGPipeline.__init__() or RAGChatbot.__init__()
-RAGPipeline(llm_provider="groq")    # Default: ultra-fast, Llama 3.3 70B
-RAGPipeline(llm_provider="deepseek")  # Alternative
+RAGPipeline(llm_provider="deepseek")  # Default
+RAGPipeline(llm_provider="groq")      # Alternative: ultra-fast, Llama 3.3 70B
 
 # CLI flags
-python src/main.py --llm-provider deepseek
+python src/main.py --llm-provider groq  # Use Groq instead
 python src/chat.py --llm-provider groq
 ```
 
@@ -263,8 +284,8 @@ doc_id = filename.replace(" ", "_").replace("/", "_").replace("\\", "_")
 The hybrid FAQ system uses a double-threshold approach:
 ```python
 # In FAQHandler
-HIGH_THRESHOLD = 0.85   # Changed from 0.90 for better coverage
-MEDIUM_THRESHOLD = 0.75 # Changed from 0.80 for better coverage
+HIGH_THRESHOLD = 0.75   # Match fuerte
+MEDIUM_THRESHOLD = 0.65 # Match medio
 
 # Query classification
 faq_classification = faq_handler.classify_query(query, top_k=5)
@@ -306,8 +327,8 @@ doc_results = [
 Required in `.env` (create from `.env.example`):
 ```
 # LLM API (at least one required, both can be configured)
-GROQ_API_KEY=your_groq_api_key_here        # Recommended: ultra-fast, 14,400 requests/day free
-DEEPSEEK_API_KEY=your_deepseek_api_key_here  # Alternative
+DEEPSEEK_API_KEY=your_deepseek_api_key_here  # Default provider
+GROQ_API_KEY=your_groq_api_key_here          # Alternative: ultra-fast, 14,400 requests/day free
 
 # Legacy SQL Server vars (not used - system uses ChromaDB)
 # DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD are ignored
@@ -321,18 +342,95 @@ DEEPSEEK_API_KEY=your_deepseek_api_key_here  # Alternative
 
 ## Key Files
 
+**Backend & Core:**
 - `src/main.py`: CLI entry point for ingestion/queries (uses legacy `query()` without FAQ)
 - `src/chat.py`: Interactive chatbot entry point (uses `query_with_faq()`)
+- `api/main.py`: FastAPI REST API server with session management
 - `src/rag/rag_pipeline.py`: Main orchestrator with both `query()` and `query_with_faq()` methods
 - `src/chatbot/chatbot.py`: Chatbot with conversation history (uses FAQ system by default)
 - `src/rag/faq_handler.py`: FAQ classification and context preparation with double thresholds
 - `src/embeddings/embedder.py`: BGE-M3 embedding generation
 - `src/database/repository.py`: CRUD operations abstraction
 - `src/database/chroma_vector_store.py`: ChromaDB backend
-- `src/llm/groq_client.py`: Groq API client with context-aware prompts (recommended, ultra-fast)
-- `src/llm/deepseek_client.py`: DeepSeek API client with context-aware prompts
+- `src/llm/groq_client.py`: Groq API client with context-aware prompts (ultra-fast alternative)
+- `src/llm/deepseek_client.py`: DeepSeek API client with context-aware prompts (default)
 - `src/rag/retriever.py`: Semantic search with cosine similarity and threshold filtering
 - `src/ingestion/ingest_docs.py`: Document loading and preprocessing (recursive, includes subdirectories)
+
+**Frontend:**
+- `frontend/src/App.jsx`: Main React component with chat interface
+- `frontend/src/App.css`: Modern styling with VOAE branding (purple gradient theme)
+- `frontend/vite.config.js`: Vite build configuration
+- `frontend/package.json`: Dependencies (React 18, Axios, Lucide icons)
+
+## Web Interface & API
+
+### FastAPI Backend (`api/main.py`)
+
+**Key Endpoints:**
+- `POST /chat`: Send message and get response (with session management)
+- `GET /stats?session_id={id}`: System statistics for a session
+- `GET /history?session_id={id}`: Get conversation history
+- `POST /clear-history?session_id={id}`: Clear session history
+- `DELETE /session/{id}`: Delete a session
+- `GET /sessions`: List all active sessions
+- `GET /health`: Health check endpoint
+- `GET /docs`: Auto-generated Swagger documentation
+
+**Session Management:**
+```python
+# Sessions stored in memory: chat_sessions = {session_id: RAGChatbot instance}
+# Each session maintains independent conversation history (max 10 messages)
+# Default session_id is "default" if not specified
+```
+
+**CORS Configuration:**
+- Allows origins: `http://localhost:3000`, `http://localhost:5173`
+- Add more origins in `api/main.py` if needed
+
+**Starting the API:**
+```bash
+cd api
+python main.py  # Runs on http://localhost:8000
+# Or with uvicorn directly:
+uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
+
+### React Frontend (`frontend/`)
+
+**Tech Stack:**
+- React 18 with Vite build tool
+- Axios for API calls
+- Lucide-react for icons
+- Modern CSS with VOAE purple gradient theme
+
+**Key Features:**
+- Real-time chat interface with typing indicators
+- Displays match type (high/medium/low) and similarity scores
+- Shows source documents with expandable previews
+- Statistics panel
+- Example questions (clickable)
+- Auto-scroll and keyboard shortcuts (Enter to send, Shift+Enter for newline)
+
+**Development:**
+```bash
+cd frontend
+npm install  # Install dependencies
+npm run dev  # Start dev server (hot reload)
+# Access at http://localhost:5173 or http://localhost:3000
+```
+
+**Production Build:**
+```bash
+cd frontend
+npm run build     # Creates optimized build in dist/
+npm run preview   # Preview production build
+```
+
+**Configuration:**
+- API endpoint configured in frontend code: `http://localhost:8000`
+- Change port in `frontend/vite.config.js` if needed
+- For production, update API URL to your deployed backend
 
 ## Error Handling Notes
 
@@ -377,11 +475,11 @@ When using `--chunk` flag during ingestion, documents are split into overlapping
 
 **FAQ System Design Choices:**
 
-1. **Double Threshold Approach (85%/75%):**
-   - Originally designed with 90%/80% thresholds, adjusted to 85%/75% for better coverage
-   - High threshold ensures precise matches for exact FAQ questions
-   - Medium threshold captures paraphrased questions while still providing FAQ context
-   - Low threshold falls back to general document search
+1. **Double Threshold Approach (75%/65%):**
+   - High threshold (≥75%) ensures precise matches for exact FAQ questions
+   - Medium threshold (65-74%) captures paraphrased questions while still providing FAQ context
+   - Low threshold (<65%) falls back to general document search
+   - Thresholds tuned for balance between precision and coverage
 
 2. **Directory-based FAQ Identification:**
    - FAQs must be in `data/docs/faq/` subdirectory
