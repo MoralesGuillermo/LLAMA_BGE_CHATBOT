@@ -42,6 +42,7 @@ app.add_middleware(
 # Estado global del chatbot
 chatbot_instance = None
 chat_sessions = {}  # {session_id: chatbot_instance}
+session_llm_providers = {}  # {session_id: llm_provider}
 
 
 # Modelos Pydantic
@@ -50,6 +51,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = "default"
     top_k: Optional[int] = 4
     temperature: Optional[float] = 0.7
+    llm_provider: Optional[str] = None  # "groq" o "deepseek"
 
 
 class ChatResponse(BaseModel):
@@ -67,6 +69,7 @@ class StatsResponse(BaseModel):
     storage_path: str
     embedder_model: str
     llm_model: str
+    llm_provider: str
     max_history: int
     current_history_length: int
 
@@ -76,11 +79,28 @@ class HistoryResponse(BaseModel):
     history: List[Dict]
 
 
+class ModelChangeRequest(BaseModel):
+    session_id: Optional[str] = "default"
+    llm_provider: str  # "groq" o "deepseek"
+
+
 # Funciones auxiliares
-def get_chatbot(session_id: str = "default") -> RAGChatbot:
+def get_chatbot(session_id: str = "default", llm_provider: str = None) -> RAGChatbot:
     """Obtiene o crea una instancia del chatbot para la sesión"""
-    if session_id not in chat_sessions:
-        chat_sessions[session_id] = RAGChatbot(max_history=10, llm_provider="deepseek")
+    # Si no se especifica proveedor, usar el guardado o default
+    if llm_provider is None:
+        llm_provider = session_llm_providers.get(session_id, "deepseek")
+
+    # Si no existe el chatbot o cambió el proveedor, recrear
+    if session_id not in chat_sessions or session_llm_providers.get(session_id) != llm_provider:
+        # Cerrar chatbot anterior si existe
+        if session_id in chat_sessions:
+            chat_sessions[session_id].close()
+
+        # Crear nuevo chatbot con el proveedor especificado
+        chat_sessions[session_id] = RAGChatbot(max_history=10, llm_provider=llm_provider)
+        session_llm_providers[session_id] = llm_provider
+
     return chat_sessions[session_id]
 
 
@@ -117,8 +137,8 @@ async def chat(request: ChatRequest):
         ChatResponse con la respuesta del chatbot y metadata
     """
     try:
-        # Obtener chatbot de la sesión
-        chatbot = get_chatbot(request.session_id)
+        # Obtener chatbot de la sesión (con proveedor LLM si se especifica)
+        chatbot = get_chatbot(request.session_id, request.llm_provider)
 
         # Procesar mensaje
         result = chatbot.chat(
@@ -158,11 +178,15 @@ async def get_stats(session_id: str = "default"):
         chatbot = get_chatbot(session_id)
         stats = chatbot.get_stats()
 
+        # Obtener el proveedor actual de la sesión
+        current_provider = session_llm_providers.get(session_id, "deepseek")
+
         return StatsResponse(
             total_documents=stats["total_documents"],
             storage_path=stats["storage_path"],
             embedder_model=stats["embedder_model"],
             llm_model=stats["llm_model"],
+            llm_provider=current_provider,
             max_history=stats["max_history"],
             current_history_length=stats["current_history_length"]
         )
@@ -265,6 +289,53 @@ async def list_sessions():
         "count": len(chat_sessions),
         "timestamp": datetime.now().isoformat()
     }
+
+
+@app.post("/change-model")
+async def change_model(request: ModelChangeRequest):
+    """
+    Cambia el proveedor de LLM para una sesión
+
+    Args:
+        request: ModelChangeRequest con session_id y llm_provider
+
+    Returns:
+        Confirmación del cambio con el nuevo modelo
+    """
+    try:
+        # Validar proveedor
+        if request.llm_provider not in ["groq", "deepseek"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Proveedor inválido. Usa 'groq' o 'deepseek'"
+            )
+
+        # Forzar recreación del chatbot con nuevo proveedor
+        if request.session_id in chat_sessions:
+            chat_sessions[request.session_id].close()
+            del chat_sessions[request.session_id]
+
+        # Actualizar el proveedor guardado
+        session_llm_providers[request.session_id] = request.llm_provider
+
+        # Crear nuevo chatbot con el proveedor especificado
+        chatbot = get_chatbot(request.session_id, request.llm_provider)
+
+        # Obtener stats del nuevo chatbot
+        stats = chatbot.get_stats()
+
+        return {
+            "message": f"Modelo cambiado exitosamente a {request.llm_provider}",
+            "session_id": request.session_id,
+            "llm_provider": request.llm_provider,
+            "llm_model": stats["llm_model"],
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al cambiar modelo: {str(e)}")
 
 
 if __name__ == "__main__":
