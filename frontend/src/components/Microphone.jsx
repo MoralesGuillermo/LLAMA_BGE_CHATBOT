@@ -1,12 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
 import {
   Mic,
   MicOff
 } from 'lucide-react';
 import '../App.css';
 
-export default async function Microphone(){
+export default function Microphone(){
     const [disabled, setDisabled] = useState(true);
     const [isRecording, setIsRecording] = useState(false);
 
@@ -23,11 +22,10 @@ export default async function Microphone(){
                 console.error("Microphone access denied:", err);
                 setDisabled(true);
             });
-    })
+    });
+
 
     // TODO: Add logic to listen for permission changes
-
-
 
     const handleRecording = async () => {
         // Prevent toggling if disabled
