@@ -26,6 +26,22 @@ export default function Microphone(){
 
 
     // TODO: Add logic to listen for permission changes
+    useEffect(() => {
+        const addMicPermissionListener = async () => {
+            navigator.permissions.query({ name: 'microphone' })
+                .then((permissionStatus) => {
+                    permissionStatus.onchange = () => {
+                        if (permissionStatus.state === 'granted') {
+                            setDisabled(false);
+                        } else {
+                            setDisabled(true);
+                        }
+                    };
+                });
+        };
+
+        addMicPermissionListener();
+    }, [])
 
     const handleRecording = async () => {
         // Prevent toggling if disabled
