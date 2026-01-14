@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Mic,
   MicOff
@@ -6,26 +6,42 @@ import {
 import '../App.css';
 
 export default function Microphone(){
+    // TODO: CLEAN CODE METHODS. SEPARATE CONCERNS FOR BETTER READABILITY
+    // TODO: Implement comm with LLM for audio transcription
     const [disabled, setDisabled] = useState(true);
     const [isRecording, setIsRecording] = useState(false);
-
+    let audioChunks = useRef([]);
+    let mediaRecorder = useRef(null);  
+    // Enable Recording and MediaRecorder setup
     useEffect(() => {
-        // Ask for microhpone access on component mount
+        // Ask for microphone access on component mount
         navigator.mediaDevices.getUserMedia({ audio: true })
-            .then((stream) => {
-                setDisabled(false);
-                // Save audio on global window for later use
-                window.localStream = stream;
-
+        .then((stream) => {
+            // Save the audio stream for later use
+            mediaRecorder.current = new MediaRecorder(stream); 
+            // Setup event handlers for MediaRecorder
+            // Add chunks to audioChunks on dataavailable
+            mediaRecorder.current.ondataavailable = (event) => {
+                audioChunks.current = [...audioChunks.current, event.data];
+            };
+            // Handle Stop logic
+            mediaRecorder.current.onstop = (event) => {
+                const blob = new Blob(audioChunks.current, { type: 'audio/wav' });
+                const audioUrl = URL.createObjectURL(blob);
+                // For testing: open the recorded audio in a new tab
+                window.open(audioUrl); 
+                // Clear audio chunks for the next recording
+                audioChunks.current = [];
+            }
+            setDisabled(false);
             })
-            .catch((err) => {
-                console.error("Microphone access denied:", err);
-                setDisabled(true);
-            });
-    });
+        .catch((err) => {
+            console.error("Microphone access denied:", err);
+            setDisabled(true);
+        });
+    }, []);
 
 
-    // TODO: Add logic to listen for permission changes
     useEffect(() => {
         const addMicPermissionListener = async () => {
             navigator.permissions.query({ name: 'microphone' })
@@ -44,15 +60,20 @@ export default function Microphone(){
     }, [])
 
     const handleRecording = async () => {
-        // Prevent toggling if disabled
         // TODO: Implement modal to inform user to enable microphone access?
+        // Prevent toggling if disabled
         if (disabled) return;
-        setIsRecording(!isRecording);
-        if (isRecording){
-            // TODO: Record user's audio
+        const toggleRecording = !isRecording;
+        if (toggleRecording){
+            // Start recording
+            mediaRecorder.current.start(1000)
+            console.log("Recording started");
         } else{
-            // TODO: Stop recording and handle audio transcription
+            // Stop recording
+            mediaRecorder.current.stop();
+            console.log("Recording stopped");
         }
+        setIsRecording(toggleRecording);
     }
 
     return (
