@@ -1,5 +1,5 @@
 """
-Módulo para manejar el sistema FAQ híbrido con umbrales dobles (90%/80%)
+Módulo para manejar el sistema FAQ híbrido con umbrales dobles (75%/65%)
 """
 import sys
 from pathlib import Path
@@ -9,19 +9,18 @@ from typing import List, Tuple, Optional, Dict
 from rag.retriever import DocumentRetriever
 from database.repository import DocumentRepository
 from embeddings.embedder import Embedder
+from config import FAQConfig
 
 
 class FAQHandler:
     """
     Maneja la lógica de FAQs con sistema de umbrales dobles:
-    - >= 90%: Match fuerte (solo FAQs)
-    - 80-89%: Match medio (FAQs + documentos)
-    - < 80%: Sin match (solo documentos - flujo original)
-    """
+    - >= 75%: Match fuerte (solo FAQs)
+    - 65-74%: Match medio (FAQs + documentos)
+    - < 65%: Sin match (solo documentos - flujo original)
 
-    # Umbrales de similitud
-    HIGH_THRESHOLD = 0.75  # Match fuerte
-    MEDIUM_THRESHOLD = 0.65  # Match medio
+    Los umbrales se configuran en config.py
+    """
 
     def __init__(self, repository: DocumentRepository, embedder: Embedder):
         """
@@ -31,7 +30,7 @@ class FAQHandler:
             repository: Repositorio de documentos
             embedder: Generador de embeddings
         """
-        self.retriever = DocumentRetriever(repository, embedder)
+        self.retriever = DocumentRetriever(repository, embedder, repository.storage)
         self.repository = repository
 
     def classify_query(self, query: str, top_k: int = 5) -> Dict:
@@ -44,14 +43,14 @@ class FAQHandler:
 
         Returns:
             Diccionario con:
-            - match_type: 'high' (>=90%), 'medium' (80-89%), 'low' (<80%)
+            - match_type: 'high' (>=75%), 'medium' (65-74%), 'low' (<65%)
             - faq_results: Lista de FAQs relevantes
             - best_similarity: Mejor score de similitud
         """
         # Buscar en TODOS los documentos primero
         all_results = self.retriever.retrieve_with_threshold(
             query=query,
-            threshold=self.MEDIUM_THRESHOLD,
+            threshold=FAQConfig.MEDIUM_THRESHOLD,
             max_documents=top_k * 2  # Buscar más para tener suficientes FAQs
         )
 
@@ -74,10 +73,10 @@ class FAQHandler:
 
         best_similarity = faq_results[0][2]  # (filename, content, similarity)
 
-        # Clasificar según umbral
-        if best_similarity >= self.HIGH_THRESHOLD:
+        # Clasificar según umbral (desde config)
+        if best_similarity >= FAQConfig.HIGH_THRESHOLD:
             match_type = 'high'
-        elif best_similarity >= self.MEDIUM_THRESHOLD:
+        elif best_similarity >= FAQConfig.MEDIUM_THRESHOLD:
             match_type = 'medium'
         else:
             match_type = 'low'
@@ -110,16 +109,20 @@ class FAQHandler:
             - context_type: 'faq_only', 'faq_and_docs', 'docs_only'
         """
         if match_type == 'high':
-            # Match fuerte: Solo top-3 FAQs
-            context = [content for _, content, _ in faq_results[:3]]
+            # Match fuerte: Solo top-N FAQs (desde config)
+            num_faqs = FAQConfig.NUM_FAQS_HIGH_MATCH
+            context = [content for _, content, _ in faq_results[:num_faqs]]
             return context, 'faq_only'
 
         elif match_type == 'medium':
-            # Match medio: Top-2 FAQs + Top-2 Docs
-            faq_context = [content for _, content, _ in faq_results[:2]]
+            # Match medio: Top-N FAQs + Top-M Docs (desde config)
+            num_faqs = FAQConfig.NUM_FAQS_MEDIUM_MATCH
+            num_docs = FAQConfig.NUM_DOCS_MEDIUM_MATCH
+
+            faq_context = [content for _, content, _ in faq_results[:num_faqs]]
 
             if doc_results:
-                doc_context = [content for _, content, _ in doc_results[:2]]
+                doc_context = [content for _, content, _ in doc_results[:num_docs]]
                 context = faq_context + doc_context
             else:
                 context = faq_context
@@ -166,12 +169,14 @@ class FAQHandler:
         Returns:
             True si debe buscar en FAQs
         """
-        # Por ahora, siempre busca en FAQs
-        # Podrías agregar lógica para detectar preguntas vs comandos
+        # Detectar comandos especiales (desde config)
         query_lower = query.lower().strip()
 
+        # Importar ChatbotConfig aquí para evitar imports circulares
+        from config import ChatbotConfig
+
         # Ignorar comandos especiales
-        if query_lower in ['salir', 'exit', 'limpiar', 'stats', 'ayuda']:
+        if query_lower in ChatbotConfig.SPECIAL_COMMANDS:
             return False
 
         return True
@@ -186,13 +191,14 @@ class FAQHandler:
         Returns:
             Valor de temperature (0.0-1.0)
         """
+        # Temperaturas desde config
         temperatures = {
-            'faq_only': 0.1,      # Muy determinista para FAQs exactos
-            'faq_and_docs': 0.2,  # Poco creativo para híbrido
-            'docs_only': 0.3      # Ligeramente más flexible para docs
+            'faq_only': FAQConfig.TEMP_FAQ_ONLY,       # Muy determinista para FAQs exactos
+            'faq_and_docs': FAQConfig.TEMP_FAQ_AND_DOCS,  # Poco creativo para híbrido
+            'docs_only': FAQConfig.TEMP_DOCS_ONLY        # Ligeramente más flexible para docs
         }
 
-        return temperatures.get(context_type, 0.3)
+        return temperatures.get(context_type, FAQConfig.TEMP_DOCS_ONLY)
 
 
 if __name__ == "__main__":
