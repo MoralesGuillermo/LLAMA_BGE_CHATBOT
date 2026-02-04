@@ -10,6 +10,8 @@ import {
   FileText
 } from 'lucide-react';
 import './App.css';
+import Mic from './components/Microphone.jsx';
+import Microphone from './components/Microphone.jsx';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -340,6 +342,7 @@ function App() {
               rows="1"
               disabled={isLoading}
             />
+            <Microphone />
             <button
               onClick={sendMessage}
               disabled={!inputMessage.trim() || isLoading}
