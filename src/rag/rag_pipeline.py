@@ -38,7 +38,7 @@ class RAGPipeline:
 
         self.repository = DocumentRepository(self.storage)
         self.ingestion = DocumentIngestion(docs_folder)
-        self.retriever = DocumentRetriever(self.repository, self.embedder)
+        self.retriever = DocumentRetriever(self.repository, self.embedder, self.storage)
         self.faq_handler = FAQHandler(self.repository, self.embedder)
 
         # Inicializar LLM según el proveedor
