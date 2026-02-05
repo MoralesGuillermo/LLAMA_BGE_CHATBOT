@@ -11,7 +11,8 @@ export default function Microphone(){
     const [disabled, setDisabled] = useState(true);
     const [isRecording, setIsRecording] = useState(false);
     let audioChunks = useRef([]);
-    let mediaRecorder = useRef(null);  
+    let mediaRecorder = useRef(null);
+    let speechRecognition = useRef(null);
     // Enable Recording and MediaRecorder setup
     useEffect(() => {
         // Ask for microphone access on component mount
@@ -19,8 +20,7 @@ export default function Microphone(){
         .then((stream) => {
             // Save the audio stream for later use
             mediaRecorder.current = new MediaRecorder(stream); 
-            // Setup event handlers for MediaRecorder
-            // Add chunks to audioChunks on dataavailable
+            // Add audio chunks when available
             mediaRecorder.current.ondataavailable = (event) => {
                 audioChunks.current = [...audioChunks.current, event.data];
             };
@@ -55,9 +55,24 @@ export default function Microphone(){
                     };
                 });
         };
-
         addMicPermissionListener();
     }, [])
+
+    // Init Speech Recognition service
+    useEffect(() => {
+        const SpeechRecognition = (window.SpeechRecognition || window.webkitSpeechRecognition);
+        if (typeof SpeechRecognition === "undefined") {
+            console.error("Speech Recognition API not supported in this browser.");
+            return;
+        }
+        speechRecognition.current = new SpeechRecognition();
+        speechRecognition.current.lang = "es-ES";
+        speechRecognition.current.onspeechend = () => {
+            speechRecognition.current.stop();
+            mediaRecorder.current.stop();
+            setIsRecording(false);
+        }
+    }, []);
 
     const handleRecording = async () => {
         // TODO: Implement modal to inform user to enable microphone access?
@@ -66,7 +81,10 @@ export default function Microphone(){
         const toggleRecording = !isRecording;
         if (toggleRecording){
             // Start recording
-            mediaRecorder.current.start(1000)
+            mediaRecorder.current.start(1000);
+            // Start recongnition service to stop on silence
+            if (speechRecognition.current)
+                speechRecognition.current?.start();
             console.log("Recording started");
         } else{
             // Stop recording
