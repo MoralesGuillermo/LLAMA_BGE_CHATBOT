@@ -14,7 +14,7 @@ sys.path.insert(0, str(BASE_DIR))
 # Cambiar al directorio base para que las rutas relativas funcionen
 os.chdir(BASE_DIR)
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -22,6 +22,7 @@ import uvicorn
 from datetime import datetime
 
 from chatbot.chatbot import RAGChatbot
+from llm.transcription_client import TranscriptionClient
 
 # Inicializar FastAPI
 app = FastAPI(
@@ -43,6 +44,16 @@ app.add_middleware(
 chatbot_instance = None
 chat_sessions = {}  # {session_id: chatbot_instance}
 session_llm_providers = {}  # {session_id: llm_provider}
+
+
+transcription_client = None
+
+def get_transcription_client():
+    """Obtiene o crea el cliente de transcripción"""
+    global transcription_client
+    if transcription_client is None:
+        transcription_client = TranscriptionClient()
+    return transcription_client
 
 
 # Modelos Pydantic
@@ -82,6 +93,10 @@ class HistoryResponse(BaseModel):
 class ModelChangeRequest(BaseModel):
     session_id: Optional[str] = "default"
     llm_provider: str  # "groq" o "deepseek"
+
+class TranscriptionResponse(BaseModel):
+    text: str
+    timestamp: str
 
 
 # Funciones auxiliares
@@ -289,6 +304,46 @@ async def list_sessions():
         "count": len(chat_sessions),
         "timestamp": datetime.now().isoformat()
     }
+
+@app.post("/transcribe", response_model=TranscriptionResponse)
+async def transcribe_audio(audio: UploadFile = File(...), language: str = "es"):
+    """
+    Transcribe audio a texto usando Groq Whisper
+
+    Optimizations:
+    - Pre-initialized transcription client (no cold start)
+    - Async file reading
+    - Direct bytes processing (no temp file)
+
+    Args:
+        audio: Archivo de audio (wav, mp3, webm, etc.)
+        language: Código de idioma (default: "es" para español)
+
+    Returns:
+        TranscriptionResponse con el texto transcrito
+    """
+    try:
+        # Read audio bytes asynchronously (faster)
+        audio_bytes = await audio.read()
+
+        # Get pre-initialized transcription client (no initialization delay)
+        client = get_transcription_client()
+
+        # Transcribe audio - Groq's LPU makes this very fast
+        print(audio.filename)
+        text = client.transcribe_audio_bytes(
+            audio_bytes=audio_bytes,
+            filename=audio.filename or "audio.webm",
+            language=language
+        )
+
+        return TranscriptionResponse(
+            text=text,
+            timestamp=datetime.now().isoformat()
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al transcribir audio: {str(e)}")
 
 
 @app.post("/change-model")
