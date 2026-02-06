@@ -10,10 +10,10 @@ export default function Microphone({ onRecorded }) {
     // TODO: Implement comm with LLM for audio transcription
     const [disabled, setDisabled] = useState(true);
     const [isRecording, setIsRecording] = useState(false);
-    const audioMimeType = 'audio/opus';
     let audioChunks = useRef([]);
     let mediaRecorder = useRef(null);
     let speechRecognition = useRef(null);
+    const audioMimeType = 'audio/opus';
     
     // Media Recorder setup
     useEffect(() => {
@@ -26,8 +26,7 @@ export default function Microphone({ onRecorded }) {
         })
         .then((stream) => {
             // Configure and set the MediaRecorder object
-            options = { mimeType: audioMimeType };
-            mediaRecorder.current = new MediaRecorder(stream, options); 
+            mediaRecorder.current = new MediaRecorder(stream); 
             
             // Handle Recording logic. Add chunks when available
             mediaRecorder.current.ondataavailable = (event) => {
@@ -37,9 +36,10 @@ export default function Microphone({ onRecorded }) {
             // Handle Stop logic
             mediaRecorder.current.onstop = (event) => {
                 const blob = new Blob(audioChunks.current, { type: audioMimeType });
-                const audioUrl = URL.createObjectURL(blob);
                 // Clear audio chunks for the next recording
                 audioChunks.current = [];
+                // Pass the recorded audio to the parent component
+                onRecorded(blob);
             }
             
             // Enable the microphone button if access was granted
