@@ -4,18 +4,16 @@
 export default async function transcribe(audioBlob){
     const apiUrl = import.meta.env.VITE_API_URL;
     const requestBody = new FormData();
-    requestBody.append('audio', audioBlob);
-    fetch(`${apiUrl}/transcribe`, {
-        method: 'POST',
-        body: requestBody,
-    })
-    .then(response => response.json())
-    .then(data => {
-        return data.text;
-    }
-    )
-    .catch(error => {
-        console.log("Error al realizar la transcripción: ", error);
+    requestBody.append('audio', audioBlob, "recording.webm");
+    try{
+        const response = fetch(`${apiUrl}/transcribe`, {
+            method: 'POST',
+            body: requestBody,
+        });
+        const data = (await response).json();
+        return data;
+    }catch(error){
+        console.error("Error al realizar la transcripción: ", error);
         return null;
-    })
+    }
 };
