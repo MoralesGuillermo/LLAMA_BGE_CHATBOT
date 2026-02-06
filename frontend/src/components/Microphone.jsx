@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import '../App.css';
 
-export default function Microphone(){
+export default function Microphone({ onRecorded }) {
     // TODO: CLEAN CODE METHODS. SEPARATE CONCERNS FOR BETTER READABILITY
     // TODO: Implement comm with LLM for audio transcription
     const [disabled, setDisabled] = useState(true);
@@ -13,35 +13,48 @@ export default function Microphone(){
     let audioChunks = useRef([]);
     let mediaRecorder = useRef(null);
     let speechRecognition = useRef(null);
-    // Enable Recording and MediaRecorder setup
+    const audioMimeType = 'audio/webm';
+    
+    // Media Recorder setup
     useEffect(() => {
         // Ask for microphone access on component mount
-        navigator.mediaDevices.getUserMedia({ audio: true })
+        navigator.mediaDevices.getUserMedia({ 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+            } 
+        })
         .then((stream) => {
-            // Save the audio stream for later use
-            mediaRecorder.current = new MediaRecorder(stream); 
-            // Add audio chunks when available
+            // Configure and set the MediaRecorder object
+            const options = {mimeType: `${audioMimeType};codecs=opus`};
+            mediaRecorder.current = new MediaRecorder(stream, options); 
+            
+            // Handle Recording logic. Add chunks when available
             mediaRecorder.current.ondataavailable = (event) => {
                 audioChunks.current = [...audioChunks.current, event.data];
             };
+
             // Handle Stop logic
             mediaRecorder.current.onstop = (event) => {
-                const blob = new Blob(audioChunks.current, { type: 'audio/wav' });
-                const audioUrl = URL.createObjectURL(blob);
-                // For testing: open the recorded audio in a new tab
-                window.open(audioUrl); 
+                const blob = new Blob(audioChunks.current, { type: audioMimeType });
                 // Clear audio chunks for the next recording
                 audioChunks.current = [];
+                // Pass the recorded audio to the parent component
+                onRecorded(blob);
             }
+            
+            // Enable the microphone button if access was granted
             setDisabled(false);
-            })
+            }
+        )
         .catch((err) => {
+            // Disable the microphone button if access was denied
             console.error("Microphone access denied:", err);
             setDisabled(true);
         });
     }, []);
 
-
+    // Listen for microphone permission changes
     useEffect(() => {
         const addMicPermissionListener = async () => {
             navigator.permissions.query({ name: 'microphone' })
@@ -58,7 +71,7 @@ export default function Microphone(){
         addMicPermissionListener();
     }, [])
 
-    // Init Speech Recognition service
+    // Init Speech Recognition service. SR is used to stop recording when user stops speaking
     useEffect(() => {
         const SpeechRecognition = (window.SpeechRecognition || window.webkitSpeechRecognition);
         if (typeof SpeechRecognition === "undefined") {
@@ -76,13 +89,13 @@ export default function Microphone(){
 
     const handleRecording = async () => {
         // TODO: Implement modal to inform user to enable microphone access?
-        // Prevent toggling if disabled
         if (disabled) return;
+
         const toggleRecording = !isRecording;
         if (toggleRecording){
             // Start recording
             mediaRecorder.current.start(1000);
-            // Start recongnition service to stop on silence
+            // Start recongnition service to stop when user stops speaking
             if (speechRecognition.current)
                 speechRecognition.current?.start();
             console.log("Recording started");

@@ -10,10 +10,16 @@ import {
   FileText
 } from 'lucide-react';
 import './App.css';
-import Mic from './components/Microphone.jsx';
+
+// Components
 import Microphone from './components/Microphone.jsx';
 
+// Services 
+import transcribe from './services/speechToText.mjs';
+
 const API_BASE_URL = 'http://localhost:8000';
+
+// TODO: AGREGAR EFECTO MIENTRAS EL BOT ESTÁ TRANSCRIBIENDO.
 
 function App() {
   const [messages, setMessages] = useState([]);
@@ -23,6 +29,7 @@ function App() {
   const [showStats, setShowStats] = useState(false);
   const [llmProvider, setLlmProvider] = useState('deepseek'); // 'deepseek' o 'groq'
   const [isChangingModel, setIsChangingModel] = useState(false);
+  const [audio, setAudio] = useState(null);
   const messagesEndRef = useRef(null);
   const sessionId = useRef(`session-${Date.now()}`);
 
@@ -32,6 +39,9 @@ function App() {
   };
 
   useEffect(() => {
+    console.log("Input: ", inputMessage);
+  })
+  useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
@@ -39,6 +49,30 @@ function App() {
   useEffect(() => {
     fetchStats();
   }, []);
+
+  // Realizar transcripción y envío del mensaje cuando se reciba un grabe un nuevo audio
+  useEffect(() => {
+    if (!audio) return;
+    const fetchData = async () => {
+      const transcription =  await transcribe(audio);
+      const text = transcription.text;
+      // There was an error when trying to transcribe the audio, show an error message in the chat
+      if (text == null){
+        const errorMessage = {
+          role: 'error',
+          content: 'Lo siento, no pude entenderte en este momento. Por favor intenta de nuevo o escribe tu pregunta.',
+          timestamp: new Date().toLocaleTimeString()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        return;
+      }
+      setInputMessage(text);
+      setTimeout(() => {
+        sendMessageWithText(text);
+      }, 300);
+    }
+    fetchData();
+  }, [audio]);
 
   const fetchStats = async () => {
     try {
@@ -54,11 +88,15 @@ function App() {
   };
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+    await sendMessageWithText(inputMessage);
+  }
+
+  const sendMessageWithText = async (message) => {
+    if (!message.trim() || isLoading) return;
 
     const userMessage = {
       role: 'user',
-      content: inputMessage,
+      content: message,
       timestamp: new Date().toLocaleTimeString()
     };
 
@@ -68,7 +106,7 @@ function App() {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/chat`, {
-        message: inputMessage,
+        message: message,
         session_id: sessionId.current,
         top_k: 4,
         temperature: 0.7,
@@ -342,7 +380,7 @@ function App() {
               rows="1"
               disabled={isLoading}
             />
-            <Microphone />
+            <Microphone onRecorded={setAudio} />
             <button
               onClick={sendMessage}
               disabled={!inputMessage.trim() || isLoading}
