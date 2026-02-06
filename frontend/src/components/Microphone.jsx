@@ -13,7 +13,7 @@ export default function Microphone({ onRecorded }) {
     let audioChunks = useRef([]);
     let mediaRecorder = useRef(null);
     let speechRecognition = useRef(null);
-    const audioMimeType = 'audio/opus';
+    const audioMimeType = 'audio/webm';
     
     // Media Recorder setup
     useEffect(() => {
@@ -26,7 +26,8 @@ export default function Microphone({ onRecorded }) {
         })
         .then((stream) => {
             // Configure and set the MediaRecorder object
-            mediaRecorder.current = new MediaRecorder(stream); 
+            const options = {mimeType: `${audioMimeType};codecs=opus`};
+            mediaRecorder.current = new MediaRecorder(stream, options); 
             
             // Handle Recording logic. Add chunks when available
             mediaRecorder.current.ondataavailable = (event) => {
