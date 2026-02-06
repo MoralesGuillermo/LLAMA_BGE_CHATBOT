@@ -10,8 +10,12 @@ import {
   FileText
 } from 'lucide-react';
 import './App.css';
-import Mic from './components/Microphone.jsx';
+
+// Components
 import Microphone from './components/Microphone.jsx';
+
+// Services 
+import transcribe from './services/speechToText.mjs';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -23,6 +27,7 @@ function App() {
   const [showStats, setShowStats] = useState(false);
   const [llmProvider, setLlmProvider] = useState('deepseek'); // 'deepseek' o 'groq'
   const [isChangingModel, setIsChangingModel] = useState(false);
+  const [audio, setAudio] = useState(null);
   const messagesEndRef = useRef(null);
   const sessionId = useRef(`session-${Date.now()}`);
 
@@ -39,6 +44,26 @@ function App() {
   useEffect(() => {
     fetchStats();
   }, []);
+
+  // Realizar transcripción y envío del mensaje cuando se reciba un grabe un nuevo audio
+  useEffect(() => {
+    if (!audio) return;
+    const transcription = transcribe(audio);
+    transcription.then(text => {
+      if (!text){
+          const errorMessage = {
+            role: 'error',
+            content: 'Lo siento, ocurrió un error al procesar tu mensaje. Por favor intenta de nuevo.',
+            timestamp: new Date().toLocaleTimeString()
+          };
+        setMessages(prev => [...prev, errorMessage]);
+        return;
+      }
+      setInputMessage(text);
+      sendMessage();
+
+    });
+  }, [audio]);
 
   const fetchStats = async () => {
     try {
@@ -342,7 +367,7 @@ function App() {
               rows="1"
               disabled={isLoading}
             />
-            <Microphone />
+            <Microphone onRecorded={setAudio} />
             <button
               onClick={sendMessage}
               disabled={!inputMessage.trim() || isLoading}
