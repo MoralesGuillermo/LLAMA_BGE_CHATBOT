@@ -325,6 +325,7 @@ async def transcribe_audio(audio: UploadFile = File(...), language: str = "es"):
     Returns:
         TranscriptionResponse con el texto transcrito
     """
+    
     try:
         # Read audio bytes asynchronously (faster)
         audio_bytes = await audio.read()
@@ -337,7 +338,7 @@ async def transcribe_audio(audio: UploadFile = File(...), language: str = "es"):
         text = client.transcribe_audio_bytes(
             audio_bytes=audio_bytes,
             filename=audio.filename or "audio.webm",
-            language=language
+            language=language,
         )
 
         return TranscriptionResponse(
