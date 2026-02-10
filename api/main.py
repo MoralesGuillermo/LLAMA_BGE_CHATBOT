@@ -14,7 +14,9 @@ sys.path.insert(0, str(BASE_DIR))
 # Cambiar al directorio base para que las rutas relativas funcionen
 os.chdir(BASE_DIR)
 
+
 from fastapi import FastAPI, HTTPException, UploadFile, File
+
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -22,6 +24,7 @@ import uvicorn
 from datetime import datetime
 
 from chatbot.chatbot import RAGChatbot
+
 from llm.transcription_client import TranscriptionClient
 
 # Inicializar FastAPI
