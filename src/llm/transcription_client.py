@@ -44,13 +44,22 @@ class TranscriptionClient:
         Raises:
             Exception: Si hay un error en la transcripción
         """
+        transcription_prompt= """
+            Pronunciations to consider, using IPA notation:
+            VOAE: /ˈβo.a.e/ || /ˈbo.a.e/
+            Summa Cum Laude: /ˈsum.ma kum ˈlau.de/
+            Magna Cum Laude: /ˈmaɡ.na kum ˈlau.de/ 
+            Cum Laude: /kum ˈlau.de/
+            UNAH: /u'na/ 
+        """
         try:
             with open(audio_file_path, "rb") as audio_file:
                 transcription = self.client.audio.transcriptions.create(
                     file=(audio_file_path, audio_file.read()),
                     model=self.model,
                     language=language,
-                    response_format="text"
+                    response_format="text",
+                    prompt=transcription_prompt
                 )
 
             return transcription
