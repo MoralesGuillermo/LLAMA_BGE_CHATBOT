@@ -6,11 +6,11 @@ export default async function transcribe(audioBlob){
     const requestBody = new FormData();
     requestBody.append('audio', audioBlob, "recording.webm");
     try{
-        const response = fetch(`${apiUrl}/transcribe`, {
+        const response = await fetch(`${apiUrl}/transcribe`, {
             method: 'POST',
             body: requestBody,
         });
-        const data = (await response).json();
+        const data = await response.json();
         return data;
     }catch(error){
         console.error("Error al realizar la transcripción: ", error);

@@ -2,6 +2,7 @@
 Cliente para transcripción de audio usando Groq Whisper
 """
 import os
+import re
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -30,6 +31,31 @@ class TranscriptionClient:
         # whisper-large-v3 is the best balance of speed and accuracy
         self.model = "whisper-large-v3"
 
+        # Términos del dominio para guiar a Whisper con la ortografía correcta.
+        # El prompt de Whisper espera texto ejemplo, NO notación fonética.
+        self._domain_terms = [
+            "VOAE",
+            "Summa Cum Laude",
+            "Magna Cum Laude",
+            "Cum Laude",
+            "UNAH",
+        ]
+        self._transcription_prompt = self._build_transcription_prompt()
+
+    def _build_transcription_prompt(self) -> str:
+        """Construye el prompt con los términos del dominio como texto ejemplo para Whisper"""
+        terms = ", ".join(self._domain_terms)
+        return f"Vocabulario específico: {terms}."
+
+    def _is_hallucination(self, text: str) -> bool:
+        """Detecta alucinaciones típicas de Whisper con audio corto o silencioso"""
+        if not text or not text.strip():
+            return True
+        # Tokens especiales de Whisper que se filtran al output
+        if re.search(r"<\|.*?\|>", text):
+            return True
+        return False
+
     def transcribe_audio(self, audio_file_path: str, language: str = "es") -> str:
         """
         Transcribe un archivo de audio a texto
@@ -44,14 +70,6 @@ class TranscriptionClient:
         Raises:
             Exception: Si hay un error en la transcripción
         """
-        transcription_prompt= """
-            Pronunciations to consider, using IPA notation:
-            VOAE: /ˈβo.a.e/ || /ˈbo.a.e/
-            Summa Cum Laude: /ˈsum.ma kum ˈlau.de/
-            Magna Cum Laude: /ˈmaɡ.na kum ˈlau.de/ 
-            Cum Laude: /kum ˈlau.de/
-            UNAH: /u'na/ 
-        """
         try:
             with open(audio_file_path, "rb") as audio_file:
                 transcription = self.client.audio.transcriptions.create(
@@ -59,8 +77,11 @@ class TranscriptionClient:
                     model=self.model,
                     language=language,
                     response_format="text",
-                    prompt=transcription_prompt
+                    prompt=self._transcription_prompt
                 )
+
+            if self._is_hallucination(transcription):
+                return None
 
             return transcription
 
@@ -87,8 +108,12 @@ class TranscriptionClient:
                 file=(filename, audio_bytes),
                 model=self.model,
                 language=language,
-                response_format="text"
+                response_format="text",
+                prompt=self._transcription_prompt
             )
+
+            if self._is_hallucination(transcription):
+                return None
 
             return transcription
 

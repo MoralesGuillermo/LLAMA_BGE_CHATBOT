@@ -54,8 +54,8 @@ function App() {
   useEffect(() => {
     if (!audio) return;
     const fetchData = async () => {
-      const transcription =  await transcribe(audio);
-      const text = transcription.text;
+      const transcription = await transcribe(audio);
+      const text = transcription?.text;
       // There was an error when trying to transcribe the audio, show an error message in the chat
       if (text == null){
         const errorMessage = {
