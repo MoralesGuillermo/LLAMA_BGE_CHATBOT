@@ -98,7 +98,7 @@ class ModelChangeRequest(BaseModel):
     llm_provider: str  # "groq" o "deepseek"
 
 class TranscriptionResponse(BaseModel):
-    text: str
+    text: Optional[str] = None
     timestamp: str
 
 
@@ -334,12 +334,17 @@ async def transcribe_audio(audio: UploadFile = File(...), language: str = "es"):
         client = get_transcription_client()
 
         # Transcribe audio - Groq's LPU makes this very fast
-        print(audio.filename)
         text = client.transcribe_audio_bytes(
             audio_bytes=audio_bytes,
             filename=audio.filename or "audio.webm",
             language=language,
         )
+
+        if text is None:
+            return TranscriptionResponse(
+                text=None,
+                timestamp=datetime.now().isoformat()
+            )
 
         return TranscriptionResponse(
             text=text,
